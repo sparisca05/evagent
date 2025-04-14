@@ -1,0 +1,241 @@
+/* Reset básico */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Estilos globales */
+html, body {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden; /* Elimina el scroll global */
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #2e8b57 0%, #3cb371 100%);
+  color: white;
+  padding: 0.8rem 1.5rem;
+  height: 80px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  background-color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2e8b57;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.logo-text h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.logo-text p {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #4caf50;
+  box-shadow: 0 0 8px #4caf50;
+}
+
+/* Contenido principal */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Sección del Bot */
+.bot-section {
+  flex: 0 0 40%;
+  background-color: #f0f4f8;
+  border-right: 1px solid #d6e0ea;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.bot-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(145deg, #e8f0f8, #ffffff);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.05);
+}
+
+/* Ajustes para el canvas del bot */
+.bot-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  object-fit: contain;
+}
+
+/* Responsive para la sección del bot */
+@media (max-width: 768px) {
+  .bot-section {
+    flex: 0 0 320px;
+    border-right: none;
+    border-bottom: 1px solid #d6e0ea;
+  }
+  
+  .bot-container {
+    padding: 1rem;
+  }
+}
+
+/* Sección del Chat */
+.chat-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .bot-section {
+    flex: 0 0 300px;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    width: 100%;
+  }
+  
+  .header-content {
+    padding: 0 1rem;
+  }
+  
+  .logo-text h1 {
+    font-size: 1.1rem;
+  }
+  
+  .logo-text p {
+    font-size: 0.8rem;
+  }
+}
+
+
+.file-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+}
+.file-upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fff8;
+  border: 1px dashed #a0c0a0;
+  border-radius: 8px;
+  margin: 20px;
+  transition: background-color 0.3s;
+}
+
+.file-upload-section:hover {
+  background-color: #e0f0e0;
+}
+
+.file-upload-section input[type="file"] {
+  display: block;
+  opacity: 0;
+  padding: 20px;
+  width: 100%;
+  height: 100%;
+}
+
+.file-upload-section label {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #2e8b57;
+  color: white;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.file-upload-section label:hover {
+  background-color: #3cb371;
+  transform: scale(1.05);
+}
+
+/* Estilizar el botón de procesar */
+.file-section button {
+  margin: 20px auto;
+  padding: 10px 20px;
+  background-color: #2e8b57;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.file-section button:hover {
+  background-color: #3cb371;
+  transform: scale(1.05);
+}

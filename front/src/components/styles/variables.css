@@ -1,0 +1,10 @@
+:root {
+    --primary-color: #2e8b57;
+    --primary-light: #3cb371;
+    --chat-bg: #f8fff8;
+    --message-user: #e1f5e1;
+    --message-bot: #ffffff;
+    --input-bg: #e0f0e0;
+    --text-dark: #1a3a1a;
+    --text-light: #708870;
+  }
