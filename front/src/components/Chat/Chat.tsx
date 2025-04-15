@@ -1,17 +1,67 @@
 import { useState, useRef } from "react";
+import axios from "axios";
 import Message from "../Message/Message";
 import "./Chat.css";
 
-const Chat = ({ messages, onSendMessage, isTyping }: any) => {
+const Chat = () => {
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef(null);
+    const [messages, setMessages] = useState([
+        {
+            text: "👋 Hi there! I'm Eva, your AI Agent that helps you to identify potencial clients for your company or business.",
+            sender: "bot",
+            timestamp: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            }),
+        },
+    ]);
+    const [isTyping, setIsTyping] = useState(false);
 
-    const handleSubmit = (e: any) => {
+    const handleSubmit = async (e: any) => {
         e.preventDefault();
+        setIsTyping(true); // Set typing state to true
+        setTimeout(() => setIsTyping(false), 2000); // Simulate typing delay
         if (inputValue.trim()) {
-            onSendMessage(inputValue);
+            // Add the user's message to the chat
+            const newMessage = {
+                text: inputValue,
+                sender: "user",
+                timestamp: new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+            };
+            setMessages((prevMessages: any) => [...prevMessages, newMessage]);
+
+            // Clear the input field
             setInputValue("");
+
+            try {
+                // Send the message to the backend
+                const response = await axios.post(
+                    "http://localhost:8000/chat",
+                    { message: inputValue }
+                );
+
+                // Add the bot's response to the chat
+                const botMessage = {
+                    text: response.data.reply,
+                    sender: "bot",
+                    timestamp: new Date().toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }),
+                };
+                setMessages((prevMessages: any) => [
+                    ...prevMessages,
+                    botMessage,
+                ]);
+            } catch (error) {
+                console.error("Error sending message to backend:", error);
+            }
         }
+        setIsTyping(false); // Set typing state to false after processing the message
     };
 
     return (
@@ -19,7 +69,7 @@ const Chat = ({ messages, onSendMessage, isTyping }: any) => {
             <div className="messages-container" ref={messagesEndRef}>
                 {isTyping && (
                     <Message
-                        text="Escribiendo..."
+                        text="Typing..."
                         sender="bot"
                         timestamp="Ahora"
                         isTyping
@@ -41,7 +91,7 @@ const Chat = ({ messages, onSendMessage, isTyping }: any) => {
                     type="text"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Escribe tu mensaje..."
+                    placeholder="Ask something to Eva"
                     autoFocus
                 />
                 <button type="submit">

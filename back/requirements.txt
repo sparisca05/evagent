@@ -1,0 +1,12 @@
+python-dotenv~=1.0.1
+fastapi
+uvicorn~=0.22.0
+python-multipart
+apify-client
+pydantic
+openpyxl
+azure-search-documents~=11.5.2
+azure-ai-projects
+openai
+azure-ai-inference~=1.0.0b8
+semantic-kernel[mcp]~=1.21.3

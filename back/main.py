@@ -1,89 +1,149 @@
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
 import os
 from dotenv import load_dotenv
-import matplotlib.pyplot as plt
-import pandas as pd
+
 import random
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+from typing import Annotated, List, Dict
+from openai import AsyncOpenAI
+from apify_client import ApifyClient
+
+from semantic_kernel.kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+from semantic_kernel.agents import ChatCompletionAgent
+from semantic_kernel.contents import ChatHistory
+
+from semantic_kernel.agents.open_ai import OpenAIAssistantAgent
+from semantic_kernel.contents import AuthorRole, ChatMessageContent
+from semantic_kernel.functions import kernel_function
+
+from semantic_kernel.connectors.ai import FunctionChoiceBehavior
+
+from semantic_kernel.contents.function_call_content import FunctionCallContent
+from semantic_kernel.contents.function_result_content import FunctionResultContent
+from semantic_kernel.functions import KernelArguments, kernel_function
+
+import pandas as pd
+from pydantic import BaseModel
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from agent import main as agent_main
 
 app = FastAPI()
+load_dotenv()
 
-# Permitir CORS para frontend
+# Store company description and LinkedIn URLs globally for simplicity
+company_description = {}
+linkedin_urls = []
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Adjust this to specific origins in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.post("/", response_class=HTMLResponse)
-async def post():
+# Define a model for the company description
+class CompanyDescription(BaseModel):
+    name: str
+    activity: str
+    target_audience: str
+
+@app.post("/upload_excel/")
+async def upload_excel(file: UploadFile):
+    """Endpoint to upload the Excel file with invitees."""
+    try:
+        # Read the Excel file
+        df = pd.read_excel(file.file)
+        if not all(col in df.columns for col in ["name", "email", "linkedin_url"]):
+            return JSONResponse(content={"error": "The file must contain 'name', 'email', and 'linkedin_url' columns."}, status_code=400)
+
+        # Extract LinkedIn URLs and associated emails
+        global linkedin_data
+        linkedin_data = [
+            {"linkedinUrl": row["linkedin_url"], "email": row["email"]}
+            for _, row in df.iterrows()
+        ]
+        return {"message": "Excel file processed successfully.", "linkedin_data": linkedin_data}
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.post("/set_company_description/")
+async def set_company_description(description: CompanyDescription):
+    """Endpoint to set the company description."""
+    global company_description
+    company_description = description
+    return {"message": "Company description set successfully.", "company_description": company_description}
+
+@app.post("/process_invitees/")
+async def process_invitees():
+    """Endpoint to process LinkedIn profiles and determine potential clients."""
+    try:
+        if not company_description or not linkedin_data:
+            return JSONResponse(content={"error": "Company description or LinkedIn URLs are missing."}, status_code=400)
+
+        # Use the agent to analyze LinkedIn profiles
+        global potential_clients_emails
+        potential_clients = await agent_main(company_description, linkedin_data)
+        potential_clients_emails = potential_clients
+        return potential_clients
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
     
+@app.post("/send_emails/")
+async def send_emails(potential_clients: List[str]):
+    """Endpoint to send personalized emails to potential clients."""
+    try:
+        # Email server configuration
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "simonpariscam@gmail.com"
+        sender_password = "mrqt jajo flix jcej"
 
-# Cargar variables de entorno
-load_dotenv()
-GEMINI_API_KEY = os.getenv("API_KEY")
+        # Connect to the email server
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
 
-# Configurar Google Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+        # Send emails to potential clients
+        for client in potential_clients:
+            recipient_email = client
+            if not recipient_email:
+                continue
 
+            # Create the email content
+            message = MIMEMultipart("alternative")
+            message["Subject"] = "You're Invited to Our Event!"
+            message["From"] = sender_email
+            message["To"] = recipient_email
 
-historial = [
-    {
-        "role": "system",
-        "content":
-            """Your name is Eva, you are an AI Agent that works for a company that 
-            is attempting to find their potential clients inside a huge event. 
-            
-            An excel sheet with a 'linkedindUrl' column will be provided by the user 
-            and you will filter the users based on their profles, looking for their 
-            personal and professional information and share their possible preferences
-            based on that information."""},
-]
+            # Customize the email body
+            email_body = f"""
+            Hi,
 
-# Iniciar conversación por consola
-print("💬 Chatbot de Negociación de Pagos (Escribe 'salir' para terminar)\n")
+            We are excited to invite you to our upcoming event! This is a great opportunity to connect and learn more about our company.
 
-respuesta = 0
+            Looking forward to seeing you there!
 
-def inferContext(mensaje):
-    historial.append({"role": "system", "content": "Define a cuál de las siguientes opciones: 1.Ampliar cuotas 2.Reducir montos 3.Disminuir intereses 4.Otra. Se refiere este mensaje: " + mensaje + " y dame una respuesta con una solución propuesta."})
-    response = model.generate_content([m["content"] for m in historial])
-    return response
+            Best regards,
+            The Team
+            """
 
-while True:
-    user_input = input("Tú: ")
-    if user_input.lower() == "salir":
-        print("👋 Adiós!")
-        break
+            message.attach(MIMEText(email_body, "plain"))
 
-    respuesta += 1
+            # Send the email
+            server.sendmail(sender_email, recipient_email, message.as_string())
 
-    # Agregar input del usuario al historial
-    historial.append({"role": "user", "content": user_input})
-    
-    if respuesta == 1:
-        # Generar valores aleatorios para crédito y días de mora
-        credito = str(random.randint(100, 300) * 10000)
-        dias = str(random.randint(10, 90))
-        
-        historial.append({"role": "context", "content": "proporciona al usuario una respuesta basada en estos ejemplos (separados por ;) y teniendo en cuenta que el crédito es " + credito + " y los dias en mora " + dias + ": " + pdf.train()} )
-        response = model.generate_content([m["content"] for m in historial])
-        historial.append({"role": "assistant", "content": response.text})
-        print(f"Isabot: {response.text}")
-    elif respuesta == 2:
-        # Inferir contexto
-        response = inferContext(user_input)
-        historial.append({"role": "system", "content": "Responde al cliente basado en esta respuesta: " + response.text})
-        print(f"Isabot: {response.text}")
-    else: 
-        # Enviar historial completo a la IA
-        response = model.generate_content([m["content"] for m in historial])
-        
-        # Agregar respuesta de la IA al historial
-        historial.append({"role": "assistant", "content": response.text})
-        print(f"Isabot: {response.text}")
+        # Close the server connection
+        server.quit()
+
+        return {"message": "Emails sent successfully."}
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
