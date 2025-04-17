@@ -1,30 +1,12 @@
-import os
-from dotenv import load_dotenv
+import json
+import io
+from uuid import uuid4
 
-import random
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, UploadFile, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from typing import Annotated, List, Dict
-from openai import AsyncOpenAI
-from apify_client import ApifyClient
-
-from semantic_kernel.kernel import Kernel
-from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
-from semantic_kernel.agents import ChatCompletionAgent
-from semantic_kernel.contents import ChatHistory
-
-from semantic_kernel.agents.open_ai import OpenAIAssistantAgent
-from semantic_kernel.contents import AuthorRole, ChatMessageContent
-from semantic_kernel.functions import kernel_function
-
-from semantic_kernel.connectors.ai import FunctionChoiceBehavior
-
-from semantic_kernel.contents.function_call_content import FunctionCallContent
-from semantic_kernel.contents.function_result_content import FunctionResultContent
-from semantic_kernel.functions import KernelArguments, kernel_function
-
+from typing import List
 import pandas as pd
 from pydantic import BaseModel
 
@@ -32,14 +14,13 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from agent import main as agent_main
+from agent import filterProfiles, agent
+from semantic_kernel.contents import ChatHistory
 
 app = FastAPI()
-load_dotenv()
 
-# Store company description and LinkedIn URLs globally for simplicity
-company_description = {}
-linkedin_urls = []
+# Dictionary to store chat histories for each session
+chat_histories = {}
 
 # Add CORS middleware
 app.add_middleware(
@@ -50,18 +31,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define a model for the company description
-class CompanyDescription(BaseModel):
-    name: str
-    activity: str
-    target_audience: str
-
 @app.post("/upload_excel/")
 async def upload_excel(file: UploadFile):
     """Endpoint to upload the Excel file with invitees."""
     try:
+        # Convert the uploaded file to a BytesIO object
+        contents = await file.read()
+        excel_data = io.BytesIO(contents)
+
         # Read the Excel file
-        df = pd.read_excel(file.file)
+        df = pd.read_excel(excel_data)
         if not all(col in df.columns for col in ["name", "email", "linkedin_url"]):
             return JSONResponse(content={"error": "The file must contain 'name', 'email', and 'linkedin_url' columns."}, status_code=400)
 
@@ -75,25 +54,83 @@ async def upload_excel(file: UploadFile):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-@app.post("/set_company_description/")
-async def set_company_description(description: CompanyDescription):
-    """Endpoint to set the company description."""
-    global company_description
-    company_description = description
-    return {"message": "Company description set successfully.", "company_description": company_description}
+class ProcessInviteesRequest(BaseModel):
+    session_id: str
 
 @app.post("/process_invitees/")
-async def process_invitees():
+async def process_invitees(request: ProcessInviteesRequest):
     """Endpoint to process LinkedIn profiles and determine potential clients."""
     try:
-        if not company_description or not linkedin_data:
-            return JSONResponse(content={"error": "Company description or LinkedIn URLs are missing."}, status_code=400)
+        global company_description  # Mark company_description as global
 
-        # Use the agent to analyze LinkedIn profiles
+        # Check if the session ID is valid
+        if request.session_id not in chat_histories:
+            chat_histories[request.session_id] = ChatHistory()
+
+        chat_history = chat_histories[request.session_id]
+
+        user_message = """Do we have a complete company description? If we have it, please provide it in this JSON format:
+            {
+                "name": "<Company Name>",
+                "activity": "<Activity>",
+                "target_audience": "<Target Audience>"
+            }
+        """
+        chat_history.add_user_message(user_message)
+
+        response_buffer = ""
+        async for content in agent.invoke_stream(chat_history):
+            if content.content:
+                response_buffer += content.content
+
+        # Parse the response to check if the description is provided
+        try:
+            parsed_response = json.loads(response_buffer)
+            if all(key in parsed_response for key in ["name", "activity", "target_audience"]):
+                company_description = parsed_response
+            else:
+                return JSONResponse(content={"error": "Company description is incomplete. Please provide it via the chat."}, status_code=400)
+        except json.JSONDecodeError:
+            return JSONResponse(content={"error": "Failed to parse the company description. Please provide it via the chat."}, status_code=400)
+
+        # Proceed with processing LinkedIn profiles
+        if not linkedin_data:
+            return JSONResponse(content={"error": "LinkedIn URLs are missing."}, status_code=400)
+
         global potential_clients_emails
-        potential_clients = await agent_main(company_description, linkedin_data)
+        potential_clients = await filterProfiles(linkedin_data, chat_history)
         potential_clients_emails = potential_clients
-        return potential_clients
+        return {"response": potential_clients_emails}
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
+@app.post("/chat/")
+async def chat(request: ChatRequest):
+    """Endpoint to chat with the agent while maintaining memory."""
+    try:
+        # Retrieve or create a new chat history for the session
+        if request.session_id not in chat_histories:
+            chat_histories[request.session_id] = ChatHistory()
+
+        chat_history = chat_histories[request.session_id]
+
+        # Add the user's message to the chat history
+        chat_history.add_user_message(request.message)
+
+        # Get the agent's response
+        response_buffer = ""
+        async for content in agent.invoke_stream(chat_history):
+            if content.content:
+                response_buffer += content.content
+
+        # Add the agent's response to the chat history
+        chat_history.add_assistant_message(response_buffer)
+
+        return {"response": response_buffer}
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     

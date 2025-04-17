@@ -16,12 +16,13 @@ const Message = ({
             className={`message ${sender}-message ${isTyping ? "typing" : ""}`}
         >
             <div className="message-content">
-                {!isTyping && <div className="message-text">{text}</div>}
-                {isTyping && (
+                {!isTyping ? (
+                    <div className="message-text">{text}</div>
+                ) : (
                     <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
+                        <span className="dot"></span>
                     </div>
                 )}
                 <div className="message-time">{timestamp}</div>

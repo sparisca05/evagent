@@ -4,7 +4,7 @@ uvicorn~=0.22.0
 python-multipart
 apify-client
 pydantic
-openpyxl
+pandas
 azure-search-documents~=11.5.2
 azure-ai-projects
 openai

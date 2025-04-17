@@ -1,32 +1,44 @@
-/* Reset básico */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* Estilos globales */
 html, body {
   height: 100%;
-  font-family: 'Inter', sans-serif;
-  overflow: hidden; /* Elimina el scroll global */
+  font-family: "National Park", sans-serif;
+  font-optical-sizing: auto;
+  overflow: hidden;
 }
 
+h2 {
+  font-weight: 500;
+  color: #f0f0f0;
+}
+
+ul {
+  list-style: none;
+}
+
+li {
+  color: #dadada
+}
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #1b1b1b;
 }
 
 /* Header */
 .header {
-  background: linear-gradient(135deg, #2e8b57 0%, #3cb371 100%);
+  background-color: #37475c;
   color: white;
   padding: 0.8rem 1.5rem;
   height: 80px;
   flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px #111111;
+  z-index: 2;
 }
 
 .header-content {
@@ -52,7 +64,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2e8b57;
+  color: #37475c;
   font-weight: bold;
   font-size: 1.1rem;
 }
@@ -88,53 +100,7 @@ html, body {
   display: flex;
   flex: 1;
   overflow: hidden;
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
-}
-
-/* Sección del Bot */
-.bot-section {
-  flex: 0 0 40%;
-  background-color: #f0f4f8;
-  border-right: 1px solid #d6e0ea;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.bot-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(145deg, #e8f0f8, #ffffff);
-  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.05);
-}
-
-/* Ajustes para el canvas del bot */
-.bot-container canvas {
-  width: 100% !important;
-  height: 100% !important;
-  display: block;
-  object-fit: contain;
-}
-
-/* Responsive para la sección del bot */
-@media (max-width: 768px) {
-  .bot-section {
-    flex: 0 0 320px;
-    border-right: none;
-    border-bottom: 1px solid #d6e0ea;
-  }
-  
-  .bot-container {
-    padding: 1rem;
-  }
 }
 
 /* Sección del Chat */
@@ -142,20 +108,13 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: white;
+  border-left: 1px solid #37475c;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .main-content {
     flex-direction: column;
-  }
-  
-  .bot-section {
-    flex: 0 0 300px;
-    border-right: none;
-    border-bottom: 1px solid #e0e0e0;
-    width: 100%;
   }
   
   .header-content {
@@ -170,7 +129,6 @@ html, body {
     font-size: 0.8rem;
   }
 }
-
 
 .file-section {
   display: flex;
@@ -187,55 +145,62 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: #f8fff8;
-  border: 1px dashed #a0c0a0;
+  background-color: #57739741;
+  border: 1px dashed #577397;
   border-radius: 8px;
   margin: 20px;
   transition: background-color 0.3s;
 }
 
 .file-upload-section:hover {
-  background-color: #e0f0e0;
+  background-color: #57739780;
 }
 
 .file-upload-section input[type="file"] {
   display: block;
-
-  padding: 20px;
+  align-items: center;
+  color: #d4d4d4;
+  padding: 40px;
   width: 100%;
   height: 100%;
 }
 
-.file-upload-section label {
-  display: inline-block;
-  padding: 10px 20px;
-  background-color: #2e8b57;
-  color: white;
-  border-radius: 25px;
+.file-upload-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 40px;
   cursor: pointer;
+  color: #d4d4d4;
+  text-align: center;
+}
+
+.file-upload-label span {
   font-size: 16px;
-  transition: background-color 0.3s, transform 0.2s;
+  opacity: 0.8;
 }
 
-.file-upload-section label:hover {
-  background-color: #3cb371;
-  transform: scale(1.05);
+.file-upload-label input[type="file"] {
+  display: none; /* Hide the actual file input */
 }
 
-/* Estilizar el botón de procesar */
 .file-section button {
+  font-family: inherit;
   margin: 20px auto;
   padding: 10px 20px;
-  background-color: #2e8b57;
+  background-color: #37475c;
   color: white;
   border: none;
   border-radius: 25px;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: background-color 0.3s, transform 0.2s;
 }
 
 .file-section button:hover {
-  background-color: #3cb371;
   transform: scale(1.05);
 }
