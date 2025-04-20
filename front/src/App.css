@@ -8,11 +8,20 @@ html, body {
   height: 100%;
   font-family: "National Park", sans-serif;
   font-optical-sizing: auto;
+  scroll-behavior: smooth;
   overflow: hidden;
 }
-
+h1 {
+  font-weight: 600;
+  color: #f0f0f0;
+  font-size: 2rem;
+}
 h2 {
   font-weight: 500;
+  color: #f0f0f0;
+}
+h3 {
+  font-weight: 400;
   color: #f0f0f0;
 }
 
@@ -100,15 +109,126 @@ li {
   display: flex;
   flex: 1;
   overflow: hidden;
-  width: 100%;
 }
 
-/* Sección del Chat */
-.chat-section {
+.agent-section {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-color: #37475c73 #1b1b1b;
+  scrollbar-width: thin;
+}
+
+.intro-section {
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  line-height: 1.5;
+  height: calc(100vh - 80px);
+}
+
+.btn {
+  width: 140px;
+  height: 50px;
+  background: linear-gradient(to top, #37475c, #37475c, #577397);
+  color: #fff;
+  border-radius: 50px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  margin-top: 30px;
+}
+
+.btn span {
+  font-size: 16px;
+  font-family: "National Park", sans-serif;
+  transition: top 0.5s;
+}
+
+.btn-text-one {
+  position: absolute;
+  width: 100%;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.btn-text-two {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  top: 150%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.btn:hover .btn-text-one {
+  top: -100%;
+}
+
+.btn:hover .btn-text-two {
+  top: 50%;
+}
+
+.steps-section {
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 80px);
+}
+/* Sección del Chat */
+.chat-section {
+  display: flex;
+  flex-direction: column;
   border-left: 1px solid #37475c;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.chat-section.collapsed {
+  min-width: 100px;
+  width: 15%;
+  margin: 20px;
+  border: 1px solid #37475c;
+  border-radius: 10px;
+}
+.chat-section.expanded {
+  width: 50%;
+}
+
+.chat-toggle {
+  color: white;
+  padding: 10px;
+  border-radius: 10px;
+  border: 3px solid #37475c;
+  cursor: pointer;
+  z-index: 10;
+}
+.chat-section.collapsed .chat-toggle {
+  color: white;
+  border: none;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-section.expanded .chat-toggle {
+  color: white;
+  border: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
 }
 
 /* Responsive */
@@ -137,8 +257,6 @@ li {
   justify-content: center;
   padding: 20px;
   border-radius: 8px;
-  margin: 20px auto;
-  max-width: 600px;
 }
 .file-upload-section {
   display: flex;
@@ -148,7 +266,8 @@ li {
   background-color: #57739741;
   border: 1px dashed #577397;
   border-radius: 8px;
-  margin: 20px;
+  margin: 20px 0;
+  width: 100%;
   transition: background-color 0.3s;
 }
 
@@ -203,4 +322,27 @@ li {
 
 .file-section button:hover {
   transform: scale(1.05);
+}
+
+.filtered-guests-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+}
+.filtered-guests-section h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+.filtered-guests-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  width: 100%;
 }

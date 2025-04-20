@@ -3,7 +3,13 @@ import axios from "axios";
 import Message from "../Message/Message";
 import "./Chat.css";
 
-const Chat = ({ sessionId }: { sessionId: string }) => {
+const Chat = ({
+    sessionId,
+    isVisible,
+}: {
+    sessionId: string;
+    isVisible: boolean;
+}) => {
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef(null);
     const [messages, setMessages] = useState<
@@ -66,7 +72,7 @@ const Chat = ({ sessionId }: { sessionId: string }) => {
     };
 
     return (
-        <div className="chat">
+        <div className="chat" style={{ display: isVisible ? "flex" : "none" }}>
             {messages.length === 0 ? (
                 <div className="welcome-message">
                     <h2>Welcome to Eva</h2>
