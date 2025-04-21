@@ -48,7 +48,17 @@ class ProcessDataPlugin:
         # Fetch and return Actor results from the run's dataset
         extractedData = []
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            extractedData.append(item)
+            extractedData.append({
+                "linkedinUrl": item.get("linkedinUrl"),
+                "firstName": item.get("firstName"),
+                "lastName": item.get("lastName"),
+                "headline": item.get("headline"),
+                "companyName": item.get("companyName"),
+                "companyIndustry": item.get("companyIndustry"),
+                "jobTitle": item.get("jobTitle"),
+                "currentJobDuration": item.get("currentJobDuration"),
+                "education": item.get("education")
+            })
 
         return extractedData
 
@@ -57,8 +67,6 @@ def create_kernel(service_id: str) -> Kernel:
     service_id = "agent"
     client = AsyncOpenAI(
         api_key=os.getenv("GITHUB_TOKEN"), base_url="https://models.inference.ai.azure.com/")
-
-    kernel.add_plugin(ProcessDataPlugin(), plugin_name="extractLinkedinData")
 
     chat_completion_service = OpenAIChatCompletion(
         ai_model_id="gpt-4o-mini",
@@ -97,10 +105,10 @@ CORE_INSTRUCTIONS = """
     The goal is to determine the interests of specific clients based on their LinkedIn profiles.
 
     - You will receive a list of LinkedIn URLs.
-    - If no LinkedIn URLs are provided, tell the user to use the buttons above so he can upload this information.
-    - Then, call the function 'extractLinkedinData' and pass it the list of LinkedIn URLs (passed with the LinkedIn URLs input) 
+    - Then, call the function 'extractLinkedinData' and pass it the list of LinkedIn URLs provided before
     to get the profile data of a each given LinkedIn URL, the function will return the profile data in JSON format.
-    - Once the JSON data has returned, analyze the profile information to define the user interests, identifying values like:
+    **Only do one call to the function 'extractLinkedinData' per LinkedIn URL.**
+    - Once the JSON data has returned, analyze the profile information to define if the user is a potential client based on the interests, identifying values like:
         - Company Name
         - Company Industry
         - Headline
@@ -111,14 +119,7 @@ CORE_INSTRUCTIONS = """
         - Education
     - Based on the analysis, determine if the client is a potential client for the company.
     - If the client is a potential client, save the LinkedIn Url of the candidate.
-    - Ask the email redactor agent to redact an email for each potential client.
-    - Provide the email redactor agent with the following information:
-        - Full Name
-        - Company Name
-        - Why you think the client be interested in your service
-    - The email redactor agent will provide a personalized email body for each potential client.
-
-    **Important**: You should not return any other information, just the field 'linkedinUrl' of the potential clients.
+    - Finally, ask the email redactor agent to redact an email for each potential client.
 """
 chatbot_kernel = create_kernel("core")
 chatbot_settings = chatbot_kernel.get_prompt_execution_settings_from_service_id(
@@ -131,6 +132,10 @@ agent_data_processer = ChatCompletionAgent(
     name=CORE_NAME,
     instructions=CORE_INSTRUCTIONS,
     arguments=KernelArguments(settings=chatbot_settings),
+)
+
+agent_data_processer.kernel.add_plugin(
+    ProcessDataPlugin(), plugin_name="extractLinkedinData"
 )
 
 # Create the Email redaction Agent
@@ -168,12 +173,6 @@ agent_redactor = ChatCompletionAgent(
 termination_function = KernelFunctionFromPrompt(
     function_name="termination",
     prompt="""
-    First stop:
-        Determine if the description is completed.
-
-        The description is complete when the description agent returns a message containing the word 'completed'.
-    
-    Second stop:
         Determine if the redaction process is complete.
 
         The process is complete when the redactor provides a full email body of any potential client sended by the core agent.
@@ -195,13 +194,13 @@ selection_function = KernelFunctionFromPrompt(
         No participant should take more than one turn in a row.
         
         There would be three different conversation escenarios:
-        1. The first one is between the user and the {DESCRIPTION_NAME} agent.
-            - The user will provide the company description and the LinkedIn URLs.
+        1. The first one is between the user and the {DESCRIPTION_NAME} agent, who will later respond to {CORE_NAME}.
             - The {DESCRIPTION_NAME} agent will ask the user for a complete company description and the LinkedIn URLs.
-            - Finally, the {DESCRIPTION_NAME} agent will provide the {CORE_NAME} agent a summarized company description and 
+            - The user will provide the company description and the LinkedIn URLs.
+            - Finally, the {DESCRIPTION_NAME} agent will provide the {CORE_NAME} agent (exclusively only to {CORE_NAME}) a summarized company description and 
             LikedIn URLs list and a message containing the word 'completed', seek for that term to pass to the next conversation.
         
-        2. The second one is between the {DESCRIPTION_NAME} agent and the {CORE_NAME} agent.
+        2. The second conversation is between the {DESCRIPTION_NAME} agent and the {CORE_NAME} agent.
             - The {DESCRIPTION_NAME} agent will provide the {CORE_NAME} agent a summarized company description and LikedIn URLs list.
             - The {CORE_NAME} agent will process the LinkedIn URLs and determine the potential clients.
             - The {CORE_NAME} agent will ask the {REDACTOR_NAME} agent to redact an email for each potential client.
@@ -229,7 +228,7 @@ chat = AgentGroupChat(
         agents=[agent_redactor],
         function=termination_function,
         kernel=create_kernel("termination"),
-        result_parser=lambda result: "'email_body'" in str(result.value[0]).lower(),
+        result_parser=lambda result: "email_body" in str(result.value[0]).lower(),
         history_variable_name="history",
         maximum_iterations=10,
     ),
