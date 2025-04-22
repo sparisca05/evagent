@@ -3,11 +3,11 @@ import io
 import re
 from uuid import uuid4
 
-from fastapi import FastAPI, UploadFile, Depends
+from fastapi import FastAPI, UploadFile, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from typing import List
+from typing import List, Dict, Any, Optional
 import pandas as pd
 from pydantic import BaseModel
 
@@ -15,7 +15,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from agent import filterProfiles, agent_data_processer
+from agent import filterProfiles, agent_data_processer, analyze_linkedin_profiles
 from semantic_kernel.contents import ChatHistory
 
 app = FastAPI()
@@ -215,3 +215,40 @@ async def send_emails(request: SendEmailsRequest):
         return {"message": "Emails sent successfully."}
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+class CompanyAnalysisRequest(BaseModel):
+    company_description: str
+    linkedin_urls: List[str]
+
+class EmailGenerationRequest(BaseModel):
+    company_description: str
+    potential_clients: List[Dict[str, Any]]
+
+@app.get("/")
+def read_root():
+    return {"message": "LinkedIn Profile Analysis API"}
+
+@app.post("/analyze")
+async def analyze_profiles(request: CompanyAnalysisRequest):
+    """
+    Analyze LinkedIn profiles based on company description
+    and generate personalized email drafts for potential clients
+    """
+    try:
+        # Call the multi-agent system to analyze profiles and generate emails
+        result = await analyze_linkedin_profiles(
+            company_description=request.company_description,
+            linkedin_urls=request.linkedin_urls
+        )
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+            
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

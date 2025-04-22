@@ -1,14 +1,16 @@
 import os
 from dotenv import load_dotenv
 import re
+import asyncio
+import json
 
-from typing import Annotated, List, Dict
+from typing import Annotated, List, Dict, Any
 from openai import AsyncOpenAI
 from apify_client import ApifyClient
 
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
-from semantic_kernel.contents import ChatHistory
+from semantic_kernel.contents import ChatHistory, ChatMessageContent, AuthorRole
 from semantic_kernel.agents import ChatCompletionAgent, AgentGroupChat
 from semantic_kernel.agents.strategies import (
     KernelFunctionSelectionStrategy,
@@ -16,57 +18,58 @@ from semantic_kernel.agents.strategies import (
 )
 
 from semantic_kernel.functions import KernelFunctionFromPrompt
-
-from semantic_kernel.agents.open_ai import OpenAIAssistantAgent
-from semantic_kernel.contents import AuthorRole, ChatMessageContent
-from semantic_kernel.functions import kernel_function
-
 from semantic_kernel.connectors.ai import FunctionChoiceBehavior
-
 from semantic_kernel.contents.function_call_content import FunctionCallContent
 from semantic_kernel.contents.function_result_content import FunctionResultContent
 from semantic_kernel.functions import KernelArguments, kernel_function
 
-import json
-
 load_dotenv()
 
 # Define the plugin for the Linkedin data extraction API
-class ProcessDataPlugin:
-    @kernel_function(description="Provides the data of some linkedin profiles list.")
-    def extractLinkedinData(self, linkedinData: List[str]) -> Annotated[str, "Returns the data of the linkedin profiles list."]:
+class LinkedInDataPlugin:
+    @kernel_function(name="extractLinkedinData", description="Provides the data of some LinkedIn profiles list.")
+    def extractLinkedinData(self, linkedinUrls: List[str]) -> Annotated[str, "Returns the data of the linkedin profiles list."]:
         """Extract LinkedIn profile data for the given URLs."""
-        # Initialize the ApifyClient with your API token
-        client = ApifyClient(os.getenv("APIFY_API_KEY"))
+        # In production, use the Apify API call
+        # client = ApifyClient(os.getenv("APIFY_API_KEY"))
+        # run_input = {"profileUrls": linkedinUrls}
+        # run = client.actor("2SyF0bVxmgGr8IVCZ").call(run_input=run_input)
+        # extractedData = []
+        # for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+        #     extractedData.append({
+        #         # Extract relevant profile data
+        #     })
+        
+        # For testing, return sample data
+        extractedData = [
+            {
+                "linkedinUrl": "https://www.linkedin.com/in/s4vitar/",
+                "firstName": "Marcelo",
+                "lastName": "Vázquez (Aka. S4vitar)",
+                "headline": "Hack4u CEO & Founder / Pentester / YouTuber / Streamer",
+                "jobTitle": "CEO & Founder",
+                "companyName": "Hack4u",
+                "companyIndustry": "E-Learning",
+                "currentJobDuration": "2 yrs",
+                "topSkillsByEndorsements": "Intrusión en sistemas, Encriptación, Bash, Seguridad, HackTheBox",
+                "experiences": [
+                    # Experience details omitted for brevity
+                ],
+                "skills": [
+                    # Skills details omitted for brevity
+                ]
+            }
+        ]
 
-        # Prepare the Actor input
-        run_input = {"profileUrls": linkedinData}
+        return json.dumps(extractedData)
 
-        # Run the Actor and wait for it to finish
-        run = client.actor("2SyF0bVxmgGr8IVCZ").call(run_input=run_input)
-
-        # Fetch and return Actor results from the run's dataset
-        extractedData = []
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            extractedData.append({
-                "linkedinUrl": item.get("linkedinUrl"),
-                "firstName": item.get("firstName"),
-                "lastName": item.get("lastName"),
-                "headline": item.get("headline"),
-                "companyName": item.get("companyName"),
-                "companyIndustry": item.get("companyIndustry"),
-                "jobTitle": item.get("jobTitle"),
-                "currentJobDuration": item.get("currentJobDuration"),
-                "education": item.get("education")
-            })
-
-        return extractedData
-
+# Utility function to create kernels with specific settings
 def create_kernel(service_id: str) -> Kernel:
     kernel = Kernel()
-    service_id = "agent"
     client = AsyncOpenAI(
-        api_key=os.getenv("GITHUB_TOKEN"), base_url="https://models.inference.ai.azure.com/")
+        api_key=os.getenv("GITHUB_TOKEN"), 
+        base_url="https://models.inference.ai.azure.com/"
+    )
 
     chat_completion_service = OpenAIChatCompletion(
         ai_model_id="gpt-4o-mini",
@@ -77,222 +80,327 @@ def create_kernel(service_id: str) -> Kernel:
 
     return kernel
 
-# Create the description agent
-DESCRIPTION_NAME = "Eva"
-DESCRIPTION_INSTRUCTIONS = """
-    You are an assistant that collects a company description from the user.
-    Your tasks include:
-    1. Asking the user for a complete company description.
-    2. Ensuring that the description includes:
-        - Company Name
-        - Activity
-        - Target Audience
-    3. If the description is not provided, ask the user for it.
-    4. Once the description is provided, return it summarized and state that it is completed in a new message.
-    """
-description_kernel = create_kernel("Eva")
-agent_description = ChatCompletionAgent(
-    service_id="Eva",
-    kernel=description_kernel,
-    name=DESCRIPTION_NAME,
-    instructions=DESCRIPTION_INSTRUCTIONS,
-)
+#
+# Agent 1: User Interface Agent (Eva)
+#
+USER_AGENT_NAME = "Eva"
+USER_AGENT_INSTRUCTIONS = """
+You are Eva, a friendly assistant that helps users analyze LinkedIn profiles to find potential clients.
 
-# Create the Core Agent
-CORE_NAME = "core"
-CORE_INSTRUCTIONS = """
-    You are an agent that helps to improve the sales of a specific company.
-    The goal is to determine the interests of specific clients based on their LinkedIn profiles.
+Your primary responsibilities are:
+1. Ask the user for a detailed description of their company, products/services, and target audience.
+2. Ensure the company description is detailed enough by asking clarifying questions if needed.
+3. Once you have collected sufficient information, inform the user that you will analyze the LinkedIn profiles.
+4. Pass the company description to the Core Agent for profile analysis.
+5. If the Core Agent asks for more details about the company, relay those questions to the user and provide their responses back to the Core Agent.
+6. When the Core Agent completes the analysis, share the results with the user.
 
-    - You will receive a list of LinkedIn URLs.
-    - Then, call the function 'extractLinkedinData' and pass it the list of LinkedIn URLs provided before
-    to get the profile data of a each given LinkedIn URL, the function will return the profile data in JSON format.
-    **Only do one call to the function 'extractLinkedinData' per LinkedIn URL.**
-    - Once the JSON data has returned, analyze the profile information to define if the user is a potential client based on the interests, identifying values like:
-        - Company Name
-        - Company Industry
-        - Headline
-        - Job Title
-        - Current Job Duration
-        - Posts and Updates topics
-        - Skills
-        - Education
-    - Based on the analysis, determine if the client is a potential client for the company.
-    - If the client is a potential client, save the LinkedIn Url of the candidate.
-    - Finally, ask the email redactor agent to redact an email for each potential client.
+Always be professional, concise, and helpful. Your goal is to gather enough information to help the Core Agent make accurate assessments.
 """
-chatbot_kernel = create_kernel("core")
-chatbot_settings = chatbot_kernel.get_prompt_execution_settings_from_service_id(
-    service_id="agent")
-chatbot_settings.function_choice_behavior = FunctionChoiceBehavior.Auto()
 
-agent_data_processer = ChatCompletionAgent(
-    service_id="core",
-    kernel=chatbot_kernel,
-    name=CORE_NAME,
-    instructions=CORE_INSTRUCTIONS,
-    arguments=KernelArguments(settings=chatbot_settings),
-)
+#
+# Agent 2: LinkedIn Profile Analyzer Agent (Core)
+#
+CORE_AGENT_NAME = "LinkedInAnalyzer"
+CORE_AGENT_INSTRUCTIONS = """
+You are a LinkedIn profile analyzer specialized in identifying potential clients based on company descriptions.
 
-agent_data_processer.kernel.add_plugin(
-    ProcessDataPlugin(), plugin_name="extractLinkedinData"
-)
+Your responsibilities:
+1. Receive company descriptions from the User Agent (Eva).
+2. Evaluate if the company description is detailed enough to make accurate assessments:
+   - If the description lacks necessary details, ask specific questions to gather more information.
+   - Only proceed with profile analysis when you have sufficient information.
+3. When the description is complete, analyze LinkedIn profiles by:
+   - Calling the extractLinkedinData function with the provided LinkedIn URLs.
+   - Evaluating each profile against the company description.
+   - Determining which profiles represent potential clients based on factors like job role, industry, skills, etc.
+4. Provide a clear report of potential clients with reasoning for your selections.
+5. Format potential clients as a JSON object like:
+   {
+     "potential_clients": [
+       {
+         "linkedinUrl": "profile URL",
+         "fullName": "First Last",
+         "reason": "Brief explanation of match"
+       }
+     ],
+     "analysis_complete": true
+   }
 
-# Create the Email redaction Agent
-REDACTOR_NAME = "redactor"
-REDACTOR_INSTRUCTIONS = """
-    You are a writer agent with ten years of experience on sales and email redaction.
-    The goal is to provide the body of an email that will be send later to a potential client.
-    Only provide a single email body, and do not include any other information.
-    The email should be personalized and should include the following information:
-    - Full Name
-    - Company Name
-    - Why you think the client be interested in your service
-
-    This information will be provided by the Chatbot agent.
-    If the information is not provided or is incomplete, ask the Chatbot agent for it.
-    The email should be written in a professional and friendly tone.
-    You're laser focused on the goal at hand.
-    You are not a generalist agent. You are a specialist in email redaction.
-
-    **Important**: You should not return any other information, just the email body.
-    The email body should be in the following format:
-    {
-        "email_body": "<Email Body>"
-    }
+Be thorough in your analysis and clear in your communication.
 """
-redactor_kernel = create_kernel("redactor")
 
-agent_redactor = ChatCompletionAgent(
-    service_id="redactor",
-    kernel=redactor_kernel,
-    name=REDACTOR_NAME,
-    instructions=REDACTOR_INSTRUCTIONS,
+#
+# Agent 3: Email Drafting Agent (Redactor)
+#
+EMAIL_AGENT_NAME = "EmailDrafter"
+EMAIL_AGENT_INSTRUCTIONS = """
+You are an experienced email drafting specialist who creates personalized sales outreach emails.
+
+Your responsibilities:
+1. Receive information about potential clients and the company seeking to contact them.
+2. Create personalized email bodies for each potential client that:
+   - Address the recipient by name
+   - Briefly introduce the company
+   - Explain why your service/product is relevant to their specific needs (based on their profile)
+   - Include a clear call-to-action
+   - Maintain a professional yet friendly tone
+3. Return your response as a JSON object with this format:
+   {
+     "emails": [
+       {
+         "linkedinUrl": "recipient's LinkedIn URL",
+         "fullName": "First Last",
+         "email_body": "Complete email body text"
+       }
+     ]
+   }
+
+Focus solely on creating effective email content. Do not provide additional commentary or explanations.
+"""
+
+# Create Kernels for each agent
+user_agent_kernel = create_kernel("user_agent")
+core_agent_kernel = create_kernel("core_agent")
+email_agent_kernel = create_kernel("email_agent")
+
+# Configure settings for agents that need special handling
+core_agent_settings = core_agent_kernel.get_prompt_execution_settings_from_service_id("core_agent")
+core_agent_settings.function_choice_behavior = FunctionChoiceBehavior.Auto()
+
+# Create the agents
+user_agent = ChatCompletionAgent(
+    service_id="user_agent",
+    kernel=user_agent_kernel,
+    name=USER_AGENT_NAME,
+    instructions=USER_AGENT_INSTRUCTIONS
 )
 
-termination_function = KernelFunctionFromPrompt(
-    function_name="termination",
-    prompt="""
-        Determine if the redaction process is complete.
-
-        The process is complete when the redactor provides a full email body of any potential client sended by the core agent.
-        The email body should be in the following format:
-        {
-            "email_body": "<Email Body>"
-        }
-
-    History:
-    {{$history}}
-    """,
+core_agent = ChatCompletionAgent(
+    service_id="core_agent",
+    kernel=core_agent_kernel,
+    name=CORE_AGENT_NAME,
+    instructions=CORE_AGENT_INSTRUCTIONS,
+    arguments=KernelArguments(settings=core_agent_settings)
 )
 
+email_agent = ChatCompletionAgent(
+    service_id="email_agent",
+    kernel=email_agent_kernel,
+    name=EMAIL_AGENT_NAME,
+    instructions=EMAIL_AGENT_INSTRUCTIONS
+)
+
+# Add the LinkedIn plugin to the core agent
+core_agent.kernel.add_plugin(LinkedInDataPlugin(), plugin_name="LinkedIn")
+
+# Define the selection function for agent group chat
 selection_function = KernelFunctionFromPrompt(
     function_name="selection",
     prompt=f"""
-        Determine which participant takes the next turn in a conversation based on the the most recent participant.
+        Determine which participant takes the next turn in a conversation based on the most recent message.
         State only the name of the participant to take the next turn.
-        No participant should take more than one turn in a row.
-        
-        There would be three different conversation escenarios:
-        1. The first one is between the user and the {DESCRIPTION_NAME} agent, who will later respond to {CORE_NAME}.
-            - The {DESCRIPTION_NAME} agent will ask the user for a complete company description and the LinkedIn URLs.
-            - The user will provide the company description and the LinkedIn URLs.
-            - Finally, the {DESCRIPTION_NAME} agent will provide the {CORE_NAME} agent (exclusively only to {CORE_NAME}) a summarized company description and 
-            LikedIn URLs list and a message containing the word 'completed', seek for that term to pass to the next conversation.
-        
-        2. The second conversation is between the {DESCRIPTION_NAME} agent and the {CORE_NAME} agent.
-            - The {DESCRIPTION_NAME} agent will provide the {CORE_NAME} agent a summarized company description and LikedIn URLs list.
-            - The {CORE_NAME} agent will process the LinkedIn URLs and determine the potential clients.
-            - The {CORE_NAME} agent will ask the {REDACTOR_NAME} agent to redact an email for each potential client.
-            - The {CORE_NAME} agent will provide the {REDACTOR_NAME} agent with the following information:
-                - Full Name
-                - Company Name
-                - Why you think the client be interested in your service
+        No participant should take more than one turn in a row unless necessary for clarification.
 
-        3. The third one is between the {CORE_NAME} agent and the {REDACTOR_NAME} agent.
-            - The {REDACTOR_NAME} agent will provide a personalized email body for each potential client.
+        The conversation is between the {USER_AGENT_NAME} agent and the {CORE_AGENT_NAME} agent.
+            - The {USER_AGENT_NAME} agent collects company description from the user.
+            - The {CORE_AGENT_NAME} agent analyzes the company description and LinkedIn profiles.
+            - If the {CORE_AGENT_NAME} agent needs more information, it asks the {USER_AGENT_NAME} agent.
+            - Once the {CORE_AGENT_NAME} agent has enough information, it will analyze the profiles and return results.
 
         Choose only from these participants:
-        - {DESCRIPTION_NAME}
-        - {CORE_NAME}
-        - {REDACTOR_NAME}
+        - {USER_AGENT_NAME}
+        - {CORE_AGENT_NAME}
 
         History:
         {{{{$history}}}}
     """,
 )
 
-chat = AgentGroupChat(
-    agents=[agent_description, agent_data_processer, agent_redactor],
+# Define the termination function for agent group chat
+termination_function = KernelFunctionFromPrompt(
+    function_name="termination",
+    prompt="""
+        Determine if the conversation between agents should terminate.
+        Respond with "true" if the conversation should terminate, or "false" if it should continue.
+        
+        Terminate the conversation if:
+        1. The analysis has been completed, indicated by a message containing "analysis_complete": true
+        2. The core agent has returned a final list of potential clients
+        
+        History:
+        {{$history}}
+    """
+)
+
+# Create the agent group chat for user interaction and profile analysis
+user_core_chat = AgentGroupChat(
+    agents=[user_agent, core_agent],
     termination_strategy=KernelFunctionTerminationStrategy(
-        agents=[agent_redactor],
         function=termination_function,
         kernel=create_kernel("termination"),
-        result_parser=lambda result: "email_body" in str(result.value[0]).lower(),
+        result_parser=lambda result: "analysis_complete" in str(result.value[0]).lower(),
         history_variable_name="history",
-        maximum_iterations=10,
+        maximum_iterations=15,
     ),
     selection_strategy=KernelFunctionSelectionStrategy(
         function=selection_function,
         kernel=create_kernel("selection"),
-        result_parser=lambda result: str(
-            result.value[0]) if result.value is not None else CORE_NAME,
-        agent_variable_name="agents",
+        result_parser=lambda result: str(result.value[0]) if result.value else CORE_AGENT_NAME,
         history_variable_name="history",
     ),
 )
 
-# Function to filter LinkedIn profiles
-async def filterProfiles(linkedin_data: List[Dict[str, str]], chat_history: ChatHistory) -> List[str]:
-    # Define the chat history if not provided
-    if not chat_history:
-        chat_history = ChatHistory()
-
-    # Add the LinkedIn URLs to the chat history
-    urls_only = [entry["linkedinUrl"] for entry in linkedin_data]
-    process_message = f"These are the LinkedIn URLs: {urls_only}." + """ 
-        Process them and give me a JSON response with the potential clients Linkedin URL only. 
-        Like this:
-        {
-            "data": [
-                {
-                    "linkedin_url": "<LinkedIn URL>"
-                }
-            ]
-        }
+async def analyze_linkedin_profiles(company_description: str, linkedin_urls: List[str]) -> Dict[str, Any]:
     """
-    chat_history.add_user_message(process_message)
-
-    # Start processing the data
-    potential_clients_urls = []
-    response_buffer = ""
-    async for content in agent_data_processer.invoke_stream(chat_history):
-        if content.content:
-            response_buffer += content.content
-
-    try:
-        # Extract JSON content using regex
-        json_match = re.search(r'\{.*\}', response_buffer, re.DOTALL)
-        if not json_match:
-            print(f"Failed to extract JSON from response: {response_buffer}")
-            return []
-        
-        # Extract only the JSON part from the response
-        json_content = json_match.group(0)
-        
-        # Parse the extracted JSON content
-        parsed_content = json.loads(json_content)
-
-        potential_clients_urls = [entry["linkedin_url"] for entry in parsed_content.get("data", [])]
-
-    except json.JSONDecodeError:
-        print(f"Failed to parse content as JSON: {response_buffer}")
+    Main function to run the LinkedIn profile analysis and email generation process with interactive user feedback.
     
-    # Map LinkedIn URLs back to their associated emails and LinkedIn URLs
-    potential_clients_urls_set = set(potential_clients_urls)
-    potential_clients = [
-        {"email": entry["email"], "linkedinUrl": entry["linkedinUrl"]} 
-        for entry in linkedin_data if entry["linkedinUrl"] in potential_clients_urls_set
-    ]
+    Args:
+        company_description: Initial description of the company
+        linkedin_urls: List of LinkedIn profile URLs to analyze
+    
+    Returns:
+        Dictionary containing analysis results and email drafts
+    """
+    # Create chat history as a list instead of ChatHistory object
+    chat_history: List[ChatMessageContent] = []
+    
+    # Add initial company description and LinkedIn URLs
+    initial_message = f"""
+    Company Description:
+    {company_description}
+    
+    LinkedIn URLs to analyze:
+    {json.dumps(linkedin_urls)}
+    """
+    # Append a user message to chat_history instead of using add_user_message
+    chat_history.append(ChatMessageContent(
+        role=AuthorRole.USER,
+        content=initial_message
+    ))
+    
+    # Flag to track if analysis is complete
+    analysis_complete = False
+    potential_clients = []
+    
+    print("Starting conversation with the agent. Type your responses when prompted.")
+    print("------------------------------------------------------")
+    
+    # Determine the next agent to speak based on conversation history
+    await user_core_chat.add_chat_messages(chat_history)
+    print("\n[User]: ", initial_message)
 
-    return potential_clients
+    # Interactive conversation loop
+    while not analysis_complete:
+        print("\n\n[Agent]: ", end="")
+        # Get the agent's response
+        response_buffer = ""
+        async for content in user_core_chat.invoke():
+            print("-")
+            response_buffer += content.content
+        print(response_buffer)
+        print("Analysis completed: ", analysis_complete)
+        # Check if the analysis is complete
+        if "analysis_complete" in response_buffer.lower() or re.search(r'\{.*"potential_clients".*\}', response_buffer, re.DOTALL):
+            try:
+                json_match = re.search(r'\{.*"potential_clients".*\}', response_buffer, re.DOTALL)
+                if json_match:
+                    analysis_result = json.loads(json_match.group(0))
+                    potential_clients = analysis_result.get("potential_clients", [])
+                    if potential_clients:
+                        analysis_complete = True
+                        print("\n\nAnalysis complete!")
+                        break
+                    else:
+                        # Handle case where analysis is complete but no potential clients were found
+                        analysis_complete = True
+                        print("\n\nAnalysis complete! No potential clients were found.")
+                        break
+            except json.JSONDecodeError:
+                # Continue the conversation if JSON parsing fails
+                pass
+        
+        # Add the agent response to chat history
+        chat_history.append(ChatMessageContent(
+            role=AuthorRole.ASSISTANT,
+            content=response_buffer
+        ))
+        
+        # If analysis not complete, get user input for follow-up
+        if not analysis_complete:
+            print("\n\n[Your response]: ", end="")
+            user_input = input()
+            chat_history.append(ChatMessageContent(
+                role=AuthorRole.USER,
+                content=user_input
+            ))
+        else:
+            # Analysis is complete, break the loop
+            break
+    
+    # Analysis is complete, proceed with email generation if potential clients were found
+    if not potential_clients:
+        return {"message": "No potential clients found in the LinkedIn profiles.", "emails": []}
+    
+    print("\nGenerating email drafts for potential clients...")
+    
+    # Prepare input for Email agent
+    email_input = {
+        "company_description": company_description,
+        "potential_clients": potential_clients
+    }
+    
+    # Create chat history for Email agent as a list
+    email_chat_history: List[ChatMessageContent] = [
+        ChatMessageContent(
+            role=AuthorRole.USER,
+            content=json.dumps(email_input)
+        )
+    ]
+    
+    # Invoke Email agent to draft emails
+    email_response = ""
+    print("\n[EmailDrafter]:")
+    async for content in email_agent.invoke_stream(email_chat_history):
+        if hasattr(content, "content") and content.content:
+            print(content.content, end="", flush=True)
+            email_response += content.content
+    
+    # Extract email drafts
+    try:
+        json_match = re.search(r'\{.*"emails".*\}', email_response, re.DOTALL)
+        if not json_match:
+            return {
+                "potential_clients": potential_clients,
+                "error": "Failed to generate email drafts"
+            }
+        
+        email_results = json.loads(json_match.group(0))
+        
+        # Return combined results
+        return {
+            "potential_clients": potential_clients,
+            "emails": email_results.get("emails", [])
+        }
+    
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse response as JSON: {str(e)}"}
+    except Exception as e:
+        return {"error": f"An error occurred: {str(e)}"}
+
+# Example usage
+async def run_example():
+    company_description = """
+    We are TechSecure Solutions, a cybersecurity company specializing in penetration testing,
+    vulnerability assessments, and security training for mid-size technology companies.
+    Our target audience is tech firms that need to strengthen their security posture,
+    particularly those working with sensitive customer data.
+    """
+    
+    linkedin_urls = ["https://www.linkedin.com/in/s4vitar/"]
+    
+    result = await analyze_linkedin_profiles(company_description, linkedin_urls)
+    print(json.dumps(result, indent=2))
+
+if __name__ == "__main__":
+    asyncio.run(run_example())
