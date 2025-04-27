@@ -222,7 +222,6 @@ termination_function = KernelFunctionFromPrompt(
     function_name="termination",
     prompt="""
         Determine if the conversation between agents should terminate.
-        Respond with "true" if the conversation should terminate, or "false" if it should continue.
         
         Terminate the conversation if:
         1. The analysis has been completed, indicated by a message containing "analysis_complete": true

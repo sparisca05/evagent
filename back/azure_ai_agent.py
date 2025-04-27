@@ -40,41 +40,42 @@ class LinkedInDataPlugin:
     def extractLinkedinData(self, linkedinUrls: List[str]) -> Annotated[str, "Returns the data of the linkedin profiles list."]:
         """Extract LinkedIn profile data for the given URLs."""
         # In production, use the Apify API call
-        # client = ApifyClient(os.getenv("APIFY_API_KEY"))
-        # run_input = {"profileUrls": linkedinUrls}
-        # run = client.actor("2SyF0bVxmgGr8IVCZ").call(run_input=run_input)
-        # extractedData = []
-        # for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-        #     extractedData.append({
-        #         # Extract relevant profile data
-        #     })
+        client = ApifyClient(os.getenv("APIFY_API_KEY"))
+        run_input = {"profileUrls": linkedinUrls}
+        run = client.actor("2SyF0bVxmgGr8IVCZ").call(run_input=run_input)
+        extractedData = []
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            extractedData.append({
+                # Extract relevant profile data
+            })
         
         # For testing, return sample data
-        extractedData = [
-            {
-                "linkedinUrl": "https://www.linkedin.com/in/s4vitar/",
-                "firstName": "Marcelo",
-                "lastName": "Vázquez (Aka. S4vitar)",
-                "headline": "Hack4u CEO & Founder / Pentester / YouTuber / Streamer",
-                "jobTitle": "CEO & Founder",
-                "companyName": "Hack4u",
-                "companyIndustry": "E-Learning",
-                "currentJobDuration": "2 yrs",
-                "topSkillsByEndorsements": "Intrusión en sistemas, Encriptación, Bash, Seguridad, HackTheBox",
-                "experiences": [
-                    # Experience details omitted for brevity
-                ],
-                "skills": [
-                    # Skills details omitted for brevity
-                ]
-            }
-        ]
+        # extractedData = [
+        #     {
+        #         "linkedinUrl": "https://www.linkedin.com/in/s4vitar/",
+        #         "firstName": "Marcelo",
+        #         "lastName": "Vázquez (Aka. S4vitar)",
+        #         "headline": "Hack4u CEO & Founder / Pentester / YouTuber / Streamer",
+        #         "jobTitle": "CEO & Founder",
+        #         "companyName": "Hack4u",
+        #         "companyIndustry": "E-Learning",
+        #         "currentJobDuration": "2 yrs",
+        #         "topSkillsByEndorsements": "Intrusión en sistemas, Encriptación, Bash, Seguridad, HackTheBox",
+        #         "experiences": [
+        #             # Experience details omitted for brevity
+        #         ],
+        #         "skills": [
+        #             # Skills details omitted for brevity
+        #         ]
+        #     }
+        # ]
 
         return json.dumps(extractedData)
 
 # Agent names and instructions
 HOST_NAME = "host"
 HOST_INSTRUCTIONS = """
+    Your name is Eva.
     You are a friendly host agent that interacts with users to collect information about their company and LinkedIn URLs.
     
     Your tasks:
@@ -273,7 +274,7 @@ class HostAgent(ChatCompletionAgent):
 
 
 # Update main function to use HostAgent
-async def main() -> None:
+async def main(message: str, chat_history: ChatHistory) -> str:
     credential = DefaultAzureCredential()
 
     async with AzureAIAgent.create_client(credential=credential, conn_str=os.getenv("PROJECT_CONNECTION_STRING")) as azure_openai_client:
@@ -317,21 +318,14 @@ async def main() -> None:
             plugins=[coordinator_agent, writer_agent],
         )
 
-        chat_history = ChatHistory()
-
-        while True:
-            user_input = input("👤 You: ")
-            if user_input.lower() in ["salir", "exit", "quit"]:
-                print("👋 ¡Hasta luego!")
-                break
-            
-            chat_history.add_user_message(user_input)
-            
-            print("🤖 Host: ", end="")
-            response = ""
-            async for content in host_agent.invoke_stream(messages=chat_history):
-                response += content.content.content
-            print(response)
+        user_input = message
+        
+        chat_history.add_user_message(user_input)
+        
+        response = ""
+        async for content in host_agent.invoke_stream(messages=chat_history):
+            response += content.content.content
+        return response
 
 
 # Función principal para ejecutar el código de prueba

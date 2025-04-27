@@ -50,6 +50,7 @@ const Chat = ({
                         },
                     }
                 );
+                console.log("Response from backend:", response.data);
 
                 // Add the bot's response to the chat
                 const botMessage = {

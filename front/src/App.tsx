@@ -1,11 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import {
-    FaRegComment,
-    FaCommentSlash,
-    FaChevronCircleRight,
-    FaArrowDown,
-} from "react-icons/fa";
+import { FaRegComment, FaArrowDown } from "react-icons/fa";
 
 import Chat from "./components/Chat/Chat";
 import "./App.css";
@@ -22,7 +17,12 @@ function App() {
     const [filteredData, setFilteredData] = useState<
         { email: string; linkedinUrl: string }[]
     >([]);
-    const [isChatOpen, setIsChatOpen] = useState(false); // State to toggle chat visibility
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [companyData, setCompanyData] = useState({
+        name: "",
+        description: "",
+        idealProfile: "",
+    });
 
     const handleFileUpload = async (event: any) => {
         const file = event.target.files
@@ -59,20 +59,53 @@ function App() {
         }
     };
 
-    const handleProcessLinkedinUrls = async () => {
-        console.log("Processing LinkedIn URLs...");
+    const handleCompanyDataChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const { name, value } = e.target;
+        setCompanyData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleCompanyDataSubmit = async (e: any) => {
+        e.preventDefault();
         try {
             const response = await axios.post(
-                "http://localhost:8000/process_invitees/",
-                { session_id: sessionId },
+                "http://localhost:8000/chat/",
+                {
+                    session_id: sessionId,
+                    message: `Company Name: ${companyData.name}, Description: ${companyData.description}, Ideal Profile: ${companyData.idealProfile}`,
+                },
                 {
                     headers: {
                         "Content-Type": "application/json",
                     },
                 }
             );
-            console.log("Response from agent:", response.data.filtered_data);
-            setFilteredData(response.data.filtered_data);
+            console.log("Response from agent:", response);
+        } catch (error) {
+            console.error("Error sending company data:", error);
+        }
+    };
+
+    const handleProcessLinkedinUrls = async () => {
+        console.log("Processing LinkedIn URLs...");
+        try {
+            const response = await axios.post(
+                "http://localhost:8000/process_invitees/",
+                {
+                    session_id: sessionId,
+                    linkedin_urls: linkedinUrls,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            console.log("Response from agent:", response.data);
         } catch (error) {
             console.error("Error processing LinkedIn URLs:", error);
         }
@@ -141,6 +174,43 @@ function App() {
                     </section>
                     <section className="steps-section" id="steps-section">
                         <section className="file-section">
+                            <h2>Provide your company description</h2>
+                            <form
+                                className="description-section"
+                                onSubmit={handleCompanyDataSubmit}
+                            >
+                                <div>
+                                    <label>Name</label>
+                                    <input
+                                        name="name"
+                                        type="text"
+                                        value={companyData.name}
+                                        onChange={handleCompanyDataChange}
+                                        placeholder="Enter company name"
+                                    />
+                                </div>
+                                <div>
+                                    <label>Description</label>
+                                    <input
+                                        name="description"
+                                        type="text"
+                                        value={companyData.description}
+                                        onChange={handleCompanyDataChange}
+                                        placeholder="Describe your company"
+                                    />
+                                </div>
+                                <div>
+                                    <label>Ideal profile</label>
+                                    <input
+                                        name="idealProfile"
+                                        type="text"
+                                        value={companyData.idealProfile}
+                                        onChange={handleCompanyDataChange}
+                                        placeholder="Describe your ideal customer profile"
+                                    />
+                                </div>
+                                <button type="submit">Send</button>
+                            </form>
                             <h2>Upload a file with invitees profiles</h2>
                             <section className="file-upload-section">
                                 <label className="file-upload-label">
@@ -225,9 +295,13 @@ function App() {
                                 />
                             </span>
                         ) : (
-                            <span className="chat-icon">
-                                <FaRegComment size={34} color="#577397" />
-                            </span>
+                            <div>
+                                <span className="chat-icon">
+                                    <FaRegComment size={34} color="#577397" />
+                                </span>
+                                <p>Agent chat</p>
+                                <span className="demo">demo</span>
+                            </div>
                         )}
                     </div>
                     <Chat sessionId={sessionId} isVisible={isChatOpen} />

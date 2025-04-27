@@ -15,8 +15,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from agent import filterProfiles, agent_data_processer, analyze_linkedin_profiles
 from semantic_kernel.contents import ChatHistory
+
+from azure_ai_agent import main as agent
 
 app = FastAPI()
 
@@ -55,59 +56,44 @@ async def upload_excel(file: UploadFile):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+
 class ProcessInviteesRequest(BaseModel):
     session_id: str
+    linkedin_urls: List[str]
 
 @app.post("/process_invitees/")
 async def process_invitees(request: ProcessInviteesRequest):
     """Endpoint to process LinkedIn profiles and determine potential clients."""
     try:
-        global company_description  # Mark company_description as global
-
-        # Check if the session ID is valid
+        # Retrieve or create a new chat history for the session
         if request.session_id not in chat_histories:
             chat_histories[request.session_id] = ChatHistory()
 
-        chat_history = chat_histories[request.session_id]
+        chat_history: ChatHistory = chat_histories[request.session_id]
+        message = f"LinkedIn urls: {request.linkedin_urls}"
 
-        user_message = """Do we have a complete company description? If we have it, please provide it in this JSON format:
-            {
-                "name": "<Company Name>",
-                "activity": "<Activity>",
-                "target_audience": "<Target Audience>"
-            }
-        """
-        chat_history.add_user_message(user_message)
+        response = await agent(message, chat_history)
 
-        response_buffer = ""
-        async for content in agent_data_processer.invoke_stream(chat_history):
-            if content.content:
-                response_buffer += content.content
+        chat_history.add_user_message(message)
+        chat_history.add_assistant_message(response)
 
         # Parse the response to check if the description is provided
         try:
             # Extract JSON content using regex
-            json_match = re.search(r'\{.*\}', response_buffer, re.DOTALL)
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if not json_match:
-                return JSONResponse(content={"error": "Failed to extract the company description. Please provide it via the chat."}, status_code=400)
+                return JSONResponse(content={"error": "Failed to extract the json response"}, status_code=400)
 
             parsed_response = json.loads(json_match.group())
-
-            if all(key in parsed_response for key in ["name", "activity", "target_audience"]):
-                company_description = parsed_response
-            else:
-                return JSONResponse(content={"error": "Company description is incomplete. Please provide it via the chat."}, status_code=400)
+            retults = parsed_response.get("results", [])
+            potential_clients = [client for client in retults if client.get("potential_match", False)]
         except json.JSONDecodeError:
-            return JSONResponse(content={"error": "Failed to parse the company description. Please provide it via the chat."}, status_code=400)
-
-        # Proceed with processing LinkedIn profiles
-        if not linkedin_data:
-            return JSONResponse(content={"error": "LinkedIn URLs are missing."}, status_code=400)
-
-        potential_clients = await filterProfiles(linkedin_data, chat_history)
-        return {"filtered_data": potential_clients}
+            return JSONResponse(content={"error": "Failed to parse the response."}, status_code=400)
+        
+        return {"potential_clients": potential_clients}
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -121,27 +107,22 @@ async def chat(request: ChatRequest):
         if request.session_id not in chat_histories:
             chat_histories[request.session_id] = ChatHistory()
 
-        chat_history = chat_histories[request.session_id]
+        chat_history: ChatHistory = chat_histories[request.session_id]
 
-        # Add the user's message to the chat history
+        response = await agent(request.message, chat_history)
+
         chat_history.add_user_message(request.message)
-
-        # Get the agent's response
-        response_buffer = ""
-        async for content in agent_data_processer.invoke_stream(chat_history):
-            if content.content:
-                response_buffer += content.content
-
-        # Add the agent's response to the chat history
-        chat_history.add_assistant_message(response_buffer)
-
-        return {"response": response_buffer}
+        chat_history.add_assistant_message(response)
+        
+        return {"response": response}
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
 
 class SendEmailsRequest(BaseModel):
     session_id: str
     potential_clients: List[str]
+
 @app.post("/send_emails/")
 async def send_emails(request: SendEmailsRequest):
     """Endpoint to send personalized emails to potential clients."""

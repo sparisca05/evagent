@@ -184,7 +184,6 @@ li {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: calc(100vh - 80px);
 }
 /* Sección del Chat */
 .chat-section {
@@ -214,6 +213,21 @@ li {
   cursor: pointer;
   z-index: 10;
 }
+.chat-toggle div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.demo {
+  font-size: 0.8rem;
+  color: #577397;
+  margin-top: 5px;
+  border-radius: 8px;
+  border: 1px solid #37475c;
+  padding: 2px 5px;
+}
+
 .chat-section.collapsed .chat-toggle {
   color: white;
   border: none;
@@ -248,6 +262,57 @@ li {
   .logo-text p {
     font-size: 0.8rem;
   }
+}
+
+.description-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 25px;
+  background-color: #57739741;
+  border-radius: 12px;
+  border: 1px solid #577397;
+}
+
+.description-section div {
+  width: 100%;
+}
+
+.description-section label {
+  display: block;
+  margin-bottom: 8px;
+  color: #f0f0f0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.description-section input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #577397;
+  border-radius: 8px;
+  background-color: #37475c;
+  color: #f0f0f0;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.description-section input:focus {
+  outline: none;
+  border-color: #577397;
+  box-shadow: 0 0 0 2px rgba(87, 115, 151, 0.2);
+}
+
+.description-section input::placeholder {
+  color: #8794a4;
+}
+
+.description-section input:hover {
+  border-color: #577397;
+  background-color: #455a75;
 }
 
 .file-section {
