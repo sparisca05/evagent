@@ -10,26 +10,94 @@ import { FaCircleChevronRight } from "react-icons/fa6";
 const sessionId = `session-${Date.now()}-${Math.random().toString(36)}`;
 
 function App() {
-    const [linkedinUrls, setLinkedinUrls] = useState<string[]>();
-    const [filePlaceholder, setFilePlaceholder] = useState(
-        "Drag and drop a file or click to select"
-    );
-    const [filteredData, setFilteredData] = useState<
-        { email: string; linkedinUrl: string }[]
-    >([]);
+    const [activeSection, setActiveSection] = useState<
+        "description" | "file" | "process" | "emails"
+    >("description");
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [companyData, setCompanyData] = useState({
         name: "",
         description: "",
         idealProfile: "",
     });
+    const sampleData = {
+        name: "TechFlow Solutions",
+        description:
+            "TechFlow Solutions is a cloud consulting firm specializing in digital transformation and cloud migration services. We help enterprises modernize their infrastructure and move to the cloud securely and efficiently.\nOur main services include:\n- Cloud architecture design and implementation\n- Legacy system modernization\n- DevOps automation\n- Cloud security and compliance\n\nWe primarily work in the enterprise IT sector, focusing on medium to large businesses looking to optimize their cloud infrastructure.",
+        idealProfile:
+            "We're looking for:\n- IT Directors, CTOs, or Technical Project Managers\n- Decision-makers in companies with 100+ employees\n- Professionals in industries going through digital transformation\n- Companies currently using on-premises infrastructure\n- Organizations in regulated industries (finance, healthcare, etc.)\n\nPreferably in companies that have expressed interest in cloud migration or have legacy systems.",
+    };
+    const [descriptionLoading, setDescriptionLoading] = useState(false);
+    const [descriptionResponse, setDescriptionResponse] = useState("");
+    const [sendButtonDisabled, setSendButtonDisabled] = useState(false);
+    const [profileData, setProfileData] = useState<
+        {
+            match_reason: string;
+            recommendations?: string;
+            email: string;
+            linkedinUrl: string;
+        }[]
+    >([]);
+    const [linkedinUrls, setLinkedinUrls] = useState<string[]>();
+    const [filePlaceholder, setFilePlaceholder] = useState(
+        "Drag and drop a file or click to select"
+    );
+    const [processing, setProcessing] = useState(false);
+    const [processButtonDisabled, setProcessButtonDisabled] = useState(false);
+    const [filteredData, setFilteredData] = useState<
+        {
+            analysis: {
+                profile: { name: string };
+            };
+            match_reason: string;
+            recommendations?: string;
+            url: string;
+        }[]
+    >([]);
+    const [emailsCreated, setEmailsCreated] = useState(false);
+    const [emails, setEmails] = useState<string>();
+
+    const handleCompanyDataChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
+        const { name, value } = e.target;
+        setCompanyData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleCompanyDataSubmit = async (e: any) => {
+        e.preventDefault();
+        setSendButtonDisabled(true);
+        setDescriptionLoading(true);
+        try {
+            const response = await axios.post(
+                "http://localhost:8000/chat/",
+                {
+                    session_id: sessionId,
+                    message: `Company Name: ${companyData.name}, Description: ${companyData.description}, Ideal Profile: ${companyData.idealProfile}`,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            console.log("Response from agent:", response);
+            setDescriptionResponse(response.data.response);
+            setActiveSection("file"); // Avanzar a la siguiente sección
+        } catch (error) {
+            console.error("Error sending company data:", error);
+        }
+        setDescriptionLoading(false);
+    };
 
     const handleFileUpload = async (event: any) => {
         const file = event.target.files
             ? event.target.files[0]
             : event.dataTransfer.files[0];
         if (file) {
-            setFilePlaceholder(file.name); // Update placeholder with file name
+            setFilePlaceholder(file.name);
             const formData = new FormData();
             formData.append("file", file);
 
@@ -48,50 +116,21 @@ function App() {
                     "Response from backend:",
                     response.data.linkedin_data
                 );
-                // Extract LinkedIn data from the response
-                const extractedData = response.data.linkedin_data;
+                const profileData = response.data.linkedin_data;
+                setProfileData(profileData);
                 setLinkedinUrls(
-                    extractedData.map((item: any) => item.linkedinUrl)
+                    profileData.map((item: any) => item.linkedinUrl)
                 );
+                setActiveSection("process"); // Avanzar a la siguiente sección
             } catch (error) {
                 console.error("Error uploading file:", error);
             }
         }
     };
 
-    const handleCompanyDataChange = (
-        e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-        const { name, value } = e.target;
-        setCompanyData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    const handleCompanyDataSubmit = async (e: any) => {
-        e.preventDefault();
-        try {
-            const response = await axios.post(
-                "http://localhost:8000/chat/",
-                {
-                    session_id: sessionId,
-                    message: `Company Name: ${companyData.name}, Description: ${companyData.description}, Ideal Profile: ${companyData.idealProfile}`,
-                },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
-            console.log("Response from agent:", response);
-        } catch (error) {
-            console.error("Error sending company data:", error);
-        }
-    };
-
     const handleProcessLinkedinUrls = async () => {
-        console.log("Processing LinkedIn URLs...");
+        setProcessButtonDisabled(true);
+        setProcessing(true);
         try {
             const response = await axios.post(
                 "http://localhost:8000/process_invitees/",
@@ -106,18 +145,96 @@ function App() {
                 }
             );
             console.log("Response from agent:", response.data);
+            setFilteredData(response.data.potential_clients);
+            setActiveSection("emails"); // Avanzar a la siguiente sección
         } catch (error) {
             console.error("Error processing LinkedIn URLs:", error);
         }
+        setProcessing(false);
+        const newProfileData = profileData.map((item) => {
+            const filteredItem = filteredData.find(
+                (filtered) => filtered.url === item.linkedinUrl
+            );
+            if (filteredItem) {
+                return {
+                    ...item,
+                    match_reason: filteredItem.match_reason,
+                    recommendations: filteredItem.recommendations,
+                };
+            } else {
+                return {
+                    ...item,
+                    match_reason: "",
+                    recommendations: "",
+                };
+            }
+        });
+        setProfileData(
+            newProfileData.filter((item) => item.match_reason !== "")
+        );
+
+        console.log(
+            "Filtered data:",
+            newProfileData.filter((item) => item.match_reason !== "")
+        );
     };
 
     const handleSendEmails = async () => {
+        console.log("Creating emails...");
+        try {
+            // Format the data for easier processing
+            const clientsInfo = filteredData.map((client) => ({
+                name: client.analysis?.profile?.name || "Client",
+                reason: client.match_reason || "",
+                url: client.url || "",
+            }));
+
+            const response = await axios.post(
+                "http://localhost:8000/chat/",
+                {
+                    session_id: sessionId,
+                    message: `Create personalized email drafts for the following potential clients:
+                    Company Information:
+                    Name: ${companyData.name}
+                    Description: ${companyData.description}
+                    
+                    Clients:
+                    ${clientsInfo
+                        .map(
+                            (client) =>
+                                `- Name: ${client.name}
+                         - LinkedIn: ${client.url}
+                         - Match Reason: ${client.reason}`
+                        )
+                        .join("\n")}
+                    
+                    Create a personalized email draft for each client, incorporating their specific match reasons and our company's value proposition.`,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            setEmailsCreated(true);
+            setEmails(response.data.response);
+            console.log("Response from writer agent:", response.data);
+
+            // Show the generated email drafts to the user
+            if (response.data && response.data.response) {
+                alert(
+                    "Email drafts generated successfully! Check the response for the personalized content."
+                );
+            }
+        } catch (error) {
+            console.error("Error creating emails:", error);
+        }
+        /*
         console.log("Sending emails...");
-        const emails = filteredData.map((item) => item.email);
         try {
             const response = await axios.post(
                 "http://localhost:8000/send_emails/",
-                { potential_clients: emails },
+                { potential_clients: filteredEmails },
                 {
                     headers: {
                         "Content-Type": "application/json",
@@ -129,6 +246,7 @@ function App() {
         } catch (error) {
             console.error("Error sending emails:", error);
         }
+        */
     };
 
     return (
@@ -154,15 +272,36 @@ function App() {
                         <h1>Welcome to Evagent</h1>
                         <h3>
                             <br />
-                            This AI Agent helps you find potential clients for
-                            your business by analyzing LinkedIn profiles.
+                            Your AI-powered LinkedIn Lead Generation Assistant
                             <br />
-                            Simply upload a file with invitee profiles, process
-                            the data, and let Eva, your AI agent, assist you in
-                            finding the right connections.
                             <br />
-                            Finally, you can send emails to the filtered users
-                            directly from this platform.
+                            Evagent helps businesses identify and connect with
+                            their ideal clients by intelligently analyzing
+                            LinkedIn profiles. Here's how it works:
+                            <br />
+                            <br />
+                            1. Tell us about your business and ideal customer
+                            profile
+                            <br />
+                            2. Upload a list of LinkedIn profiles to analyze
+                            <br />
+                            3. Let our AI analyze and match profiles to your
+                            criteria
+                            <br />
+                            4. Generate personalized outreach emails for
+                            qualified leads
+                            <br />
+                            <br />
+                            Perfect for sales teams, recruiters, and business
+                            developers who want to:
+                            <br />
+                            • Save time on lead qualification
+                            <br />
+                            • Improve targeting accuracy
+                            <br />
+                            • Create personalized outreach at scale
+                            <br />
+                            • Connect with the right decision-makers
                             <br />
                         </h3>
                         <a href="#steps-section" className="btn">
@@ -173,108 +312,240 @@ function App() {
                         </a>
                     </section>
                     <section className="steps-section" id="steps-section">
-                        <section className="file-section">
-                            <h2>Provide your company description</h2>
-                            <form
-                                className="description-section"
-                                onSubmit={handleCompanyDataSubmit}
-                            >
-                                <div>
-                                    <label>Name</label>
-                                    <input
-                                        name="name"
-                                        type="text"
-                                        value={companyData.name}
-                                        onChange={handleCompanyDataChange}
-                                        placeholder="Enter company name"
-                                    />
-                                </div>
-                                <div>
-                                    <label>Description</label>
-                                    <input
-                                        name="description"
-                                        type="text"
-                                        value={companyData.description}
-                                        onChange={handleCompanyDataChange}
-                                        placeholder="Describe your company"
-                                    />
-                                </div>
-                                <div>
-                                    <label>Ideal profile</label>
-                                    <input
-                                        name="idealProfile"
-                                        type="text"
-                                        value={companyData.idealProfile}
-                                        onChange={handleCompanyDataChange}
-                                        placeholder="Describe your ideal customer profile"
-                                    />
-                                </div>
-                                <button type="submit">Send</button>
-                            </form>
-                            <h2>Upload a file with invitees profiles</h2>
-                            <section className="file-upload-section">
-                                <label className="file-upload-label">
-                                    <span className="file-icon">📁</span>
-                                    <input
-                                        name="file"
-                                        type="file"
-                                        draggable
-                                        accept=".xlsx, .xls"
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            handleFileUpload(e);
+                        <section
+                            className={`step-container ${
+                                activeSection === "description"
+                                    ? "active"
+                                    : "inactive"
+                            }`}
+                        >
+                            <h2>Step 1: Provide your company information</h2>
+                            <div className="description-section step-content">
+                                <form onSubmit={handleCompanyDataSubmit}>
+                                    <div>
+                                        <label>Name</label>
+                                        <input
+                                            name="name"
+                                            type="text"
+                                            value={companyData.name}
+                                            onChange={handleCompanyDataChange}
+                                            placeholder="Enter your company name"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label>
+                                            Description{" "}
+                                            <span className="info">
+                                                <span
+                                                    id="profile-info"
+                                                    className="info-icon"
+                                                >
+                                                    i
+                                                </span>
+
+                                                <p
+                                                    id="profile-info-text"
+                                                    className="info-text"
+                                                >
+                                                    A detailed description will
+                                                    help the AI understand your
+                                                    business better.
+                                                </p>
+                                            </span>
+                                        </label>
+                                        <textarea
+                                            name="description"
+                                            maxLength={500}
+                                            value={companyData.description}
+                                            onChange={handleCompanyDataChange}
+                                            placeholder={`Describe your company and its services or products.\n\nBe specific and ensure to include this details:\n- What does your company do?\n- What are your main products or services?\n- What is your main industry activity?`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label>
+                                            Ideal profile{" "}
+                                            <span className="info">
+                                                <span
+                                                    id="profile-info"
+                                                    className="info-icon"
+                                                >
+                                                    i
+                                                </span>
+
+                                                <p
+                                                    id="profile-info-text"
+                                                    className="info-text"
+                                                >
+                                                    A detailed description will
+                                                    help the AI filter the
+                                                    LinkedIn profiles more
+                                                    effectively.
+                                                </p>
+                                            </span>
+                                        </label>
+                                        <textarea
+                                            name="idealProfile"
+                                            maxLength={300}
+                                            value={companyData.idealProfile}
+                                            onChange={handleCompanyDataChange}
+                                            placeholder={`Describe the ideal profile of your potential clients.\n\nBe specific and ensure to include this details:\n- What is the job title or role of your ideal client?\n- What industry or sector do they belong to?\n- Any other specific characteristics?`}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-sample"
+                                        onClick={() => {
+                                            setCompanyData(sampleData);
                                         }}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onChange={handleFileUpload}
-                                    />
-                                    <span>{filePlaceholder}</span>
-                                </label>
-                            </section>
+                                    >
+                                        Use sample values
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={sendButtonDisabled}
+                                    >
+                                        Submit
+                                    </button>
+                                </form>
+                            </div>
+                            <div className="agent-response-section">
+                                <h2>Agent Response</h2>
+                                <p>
+                                    {descriptionLoading ? (
+                                        <span className="loading-text">
+                                            Loading response...
+                                        </span>
+                                    ) : (
+                                        <span className="response-text">
+                                            {descriptionResponse}
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        </section>
+
+                        <section
+                            className={`step-container ${
+                                activeSection === "file" ? "active" : "inactive"
+                            }`}
+                        >
+                            <h2>
+                                Step 2: Upload a file with invitees profiles
+                            </h2>
+                            <div className="step-content">
+                                <section className="file-upload-section">
+                                    <label className="file-upload-label">
+                                        <span className="file-icon">📁</span>
+                                        <input
+                                            name="file"
+                                            type="file"
+                                            draggable
+                                            accept=".xlsx, .xls"
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                handleFileUpload(e);
+                                            }}
+                                            onDragOver={(e) =>
+                                                e.preventDefault()
+                                            }
+                                            onChange={handleFileUpload}
+                                        />
+                                        <span>{filePlaceholder}</span>
+                                    </label>
+                                </section>
+                            </div>
                             <h2>Extracted LinkedIn URLs</h2>
                             <ul>
-                                {linkedinUrls !== undefined ? (
+                                {linkedinUrls !== undefined &&
                                     linkedinUrls.map((url, index) => (
                                         <li key={index}>
                                             <a href={url} target="_blank">
                                                 {url}
                                             </a>
                                         </li>
-                                    ))
-                                ) : (
-                                    <li>No LinkedIn URLs found.</li>
-                                )}
+                                    ))}
                             </ul>
-                            <button onClick={handleProcessLinkedinUrls}>
-                                Process LinkedIn URLs
-                            </button>
+                        </section>
+
+                        <section
+                            className={`step-container ${
+                                activeSection === "process"
+                                    ? "active"
+                                    : "inactive"
+                            }`}
+                        >
+                            <h2>Step 3: Process LinkedIn URLs</h2>
+                            <div className="step-content">
+                                <button
+                                    onClick={handleProcessLinkedinUrls}
+                                    disabled={processButtonDisabled}
+                                >
+                                    Process LinkedIn URLs
+                                </button>
+                            </div>
                             <section className="filtered-guests-section">
                                 <h2>Filtered Users</h2>
-                                <ul>
-                                    {filteredData.length > 0 ? (
-                                        filteredData.map((item, index) => (
-                                            <li key={index}>
-                                                <strong>Email:</strong>{" "}
-                                                {item.email}
-                                                <br />
-                                                <strong>
-                                                    LinkedIn URL:
-                                                </strong>{" "}
-                                                <a
-                                                    href={item.linkedinUrl}
-                                                    target="_blank"
-                                                >
-                                                    {item.linkedinUrl}
-                                                </a>
-                                            </li>
-                                        ))
-                                    ) : (
-                                        <li>No filtered URLs found.</li>
-                                    )}
-                                </ul>
+                                {processing ? (
+                                    <span className="loading-text">
+                                        Processing LinkedIn URLs...
+                                    </span>
+                                ) : (
+                                    <ul>
+                                        {filteredData.length > 0 &&
+                                            filteredData.map((item, index) => (
+                                                <li key={index}>
+                                                    <strong>Name:</strong>{" "}
+                                                    {item.url}
+                                                    <br />
+                                                    <strong>
+                                                        Match reason:
+                                                    </strong>{" "}
+                                                    {item.match_reason}
+                                                </li>
+                                            ))}
+                                    </ul>
+                                )}
                             </section>
-                            <button onClick={handleSendEmails}>
-                                Send Emails
-                            </button>
+                        </section>
+
+                        <section
+                            className={`step-container ${
+                                activeSection === "emails"
+                                    ? "active"
+                                    : "inactive"
+                            }`}
+                        >
+                            <h2>Step 4: Send Emails</h2>
+                            <div className="step-content">
+                                {emailsCreated && (
+                                    <p className="success-message">
+                                        Emails created successfully!
+                                    </p>
+                                )}
+                                <p className="info-message">
+                                    You can send personalized emails to the
+                                    filtered users based on the generated
+                                    drafts.
+                                    <br />
+                                    Click the button below to send emails.
+                                </p>
+                                <button
+                                    onClick={handleSendEmails}
+                                    disabled={emailsCreated}
+                                >
+                                    Generate Emails
+                                </button>
+                            </div>
+                            <h2>Agent Response</h2>
+                            <section className="agent-response-section">
+                                <p>
+                                    {emailsCreated && (
+                                        <span className="response-text">
+                                            {emails}
+                                        </span>
+                                    )}
+                                </p>
+                            </section>
                         </section>
                     </section>
                 </section>

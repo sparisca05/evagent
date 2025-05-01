@@ -1,29 +1,18 @@
 import os
 from dotenv import load_dotenv
-import re
 import asyncio
 from azure.identity import DefaultAzureCredential
 import json
 from pydantic import BaseModel, Field
-from typing import Annotated, List, Dict, Any, Optional
-from openai import AzureOpenAI
+from typing import Annotated, List, Any, Optional
 from apify_client import ApifyClient
 
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-from semantic_kernel.memory import VolatileMemoryStore, SemanticTextMemory
 from semantic_kernel.agents import ChatCompletionAgent, AzureAIAgent
-from semantic_kernel.agents.strategies import (
-    KernelFunctionSelectionStrategy,
-    KernelFunctionTerminationStrategy,
-)
 
-from semantic_kernel.functions import KernelFunctionFromPrompt
-from semantic_kernel.connectors.ai import FunctionChoiceBehavior
 from semantic_kernel.contents import AuthorRole, ChatMessageContent, ChatHistory
-from semantic_kernel.contents.function_call_content import FunctionCallContent
-from semantic_kernel.contents.function_result_content import FunctionResultContent
-from semantic_kernel.functions import KernelArguments, kernel_function
+from semantic_kernel.functions import kernel_function
 
 
 load_dotenv()
@@ -46,7 +35,17 @@ class LinkedInDataPlugin:
         extractedData = []
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             extractedData.append({
-                # Extract relevant profile data
+                "linkedinUrl": item.get("linkedinUrl"),
+                "firstName": item.get("firstName"),
+                "lastName": item.get("lastName"),
+                "headline": item.get("headline"),
+                "jobTitle": item.get("jobTitle"),
+                "companyName": item.get("companyName"),
+                "companyIndustry": item.get("companyIndustry"),
+                "currentJobDuration": item.get("currentJobDuration"),
+                "topSkillsByEndorsements": item.get("topSkillsByEndorsements"),
+                "experiences": item.get("experiences"),
+                "skills": item.get("skills"),
             })
         
         # For testing, return sample data
@@ -194,92 +193,13 @@ class HostAgent(ChatCompletionAgent):
             )
             yield content
 
-    async def process_message(self, message: str) -> str:
-        try:
-            # If message contains company information, update it
-            if any(keyword in message.lower() for keyword in ["company", "business", "startup", "enterprise"]):
-                # Simple parsing for demonstration - you might want to make this more robust
-                if "name:" in message.lower():
-                    self.company_info.name = message.split("name:")[1].split("\n")[0].strip()
-                if "industry:" in message.lower():
-                    self.company_info.industry = message.split("industry:")[1].split("\n")[0].strip()
-                if "description:" in message.lower():
-                    self.company_info.description = message.split("description:")[1].split("\n")[0].strip()
-                if "target:" in message.lower():
-                    self.company_info.target_profile = message.split("target:")[1].split("\n")[0].strip()
-                return "Company information updated successfully!"
-
-            # If message contains LinkedIn URLs, format with company info
-            if "linkedin.com" in message:
-                if not self.company_info.description:
-                    return "Please provide company information first before analyzing LinkedIn profiles."
-                
-                urls = re.findall(r'https://[^\s<>"]+|www\.[^\s<>"]+', message)
-                return json.dumps({
-                    "action": "analyze_profiles",
-                    "company_description": self.company_info.description,
-                    "company_info": self.company_info.dict(),
-                    "linkedin_urls": urls
-                })
-            return message
-        except Exception as e:
-            print(f"Error in process_message: {str(e)}")
-            return "I encountered an error while processing your message. Please try again."
-
-    def format_analysis_response(self, data: Dict) -> str:
-        try:
-            if not isinstance(data, dict):
-                return "Invalid response format received."
-
-            if data.get("status") == "processing":
-                return f"⏳ Analyzing profiles... Progress: {data.get('processed_urls', 0)}/{data.get('total_urls', 0)} profiles"
-            
-            if data.get("status") == "complete" and "results" in data:
-                response = "✅ Analysis complete! Here's what I found:\n\n"
-                for result in data.get("results", []):
-                    try:
-                        profile = result.get("analysis", {})
-                        is_potential = result.get("potential_match", False)
-                        reason = result.get("match_reason", "")
-                        
-                        if isinstance(profile, str):
-                            profile = json.loads(profile)
-                        
-                        if isinstance(profile, list) and len(profile) > 0:
-                            profile = profile[0]
-                        
-                        response += f"📊 Profile Analysis:\n"
-                        response += f"- Name: {profile.get('firstName', '')} {profile.get('lastName', '')}\n"
-                        response += f"- Current Role: {profile.get('headline', '')}\n"
-                        response += f"- Skills: {profile.get('topSkillsByEndorsements', '')}\n"
-                        response += f"- Potential Client: {'✅ Yes' if is_potential else '❌ No'}\n"
-                        if reason:
-                            response += f"- Reason: {reason}\n"
-                        response += "\n"
-                    except (json.JSONDecodeError, AttributeError, TypeError) as e:
-                        print(f"Error processing result: {str(e)}")
-                        continue
-                
-                if data.get("errors"):
-                    response += "\n⚠️ Some profiles had errors during analysis:\n"
-                    for error in data.get("errors", []):
-                        response += f"- {error}\n"
-                
-                return response
-            
-            return "I've received your request and I'm processing it..."
-        except Exception as e:
-            print(f"Error in format_analysis_response: {str(e)}")
-            return "Error formatting the analysis response. Please try again."
-
-
 # Update main function to use HostAgent
 async def main(message: str, chat_history: ChatHistory) -> str:
     credential = DefaultAzureCredential()
 
     async with AzureAIAgent.create_client(credential=credential, conn_str=os.getenv("PROJECT_CONNECTION_STRING")) as azure_openai_client:
 
-        agent_definition = await azure_openai_client.agents.get_agent("asst_9BgimlhYYixIAlosauM57I45") 
+        agent_definition = await azure_openai_client.agents.get_agent(os.getenv("WRITER_AGENT_ID")) 
         
         # Create kernels for agents
         linkedin_kernel = create_kernel("linkedin")
@@ -303,7 +223,7 @@ async def main(message: str, chat_history: ChatHistory) -> str:
             plugins=[linkedin_agent],  # Coordinator can use LinkedIn agent directly
         )
 
-        # Create the writer agent
+        # Create the writer agent with Azure OpenAI client hosted in Azure
         writer_agent = AzureAIAgent(
             client=azure_openai_client,
             definition=agent_definition,
@@ -325,6 +245,7 @@ async def main(message: str, chat_history: ChatHistory) -> str:
         response = ""
         async for content in host_agent.invoke_stream(messages=chat_history):
             response += content.content.content
+        print(f"Host agent response: {response}")
         return response
 
 

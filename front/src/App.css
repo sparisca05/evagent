@@ -25,13 +25,6 @@ h3 {
   color: #f0f0f0;
 }
 
-ul {
-  list-style: none;
-}
-
-li {
-  color: #dadada
-}
 .app {
   display: flex;
   flex-direction: column;
@@ -127,7 +120,7 @@ li {
   justify-content: center;
   color: white;
   line-height: 1.5;
-  height: calc(100vh - 80px);
+  height: 80vh;
 }
 
 .btn {
@@ -185,6 +178,85 @@ li {
   align-items: center;
   justify-content: center;
 }
+.steps-section button {
+  font-family: inherit;
+  margin: 20px auto;
+  padding: 10px 20px;
+  background-color: #445872;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.steps-section button:hover {
+  transform: scale(1.05);
+}
+
+.steps-section button:active {
+  transform: scale(0.95);
+}
+.steps-section button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.step-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 15px auto;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+.step-container.inactive {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: scale(0.98);
+}
+.step-container.inactive .step-content {
+  display: none;
+}
+.step-container.active {
+  opacity: 1;
+  background-color: #57739741;
+  border: 1px solid #577397;
+  padding: 20px;
+}
+.step-container h2 {
+  color: #f0f0f0;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  padding: 10px;
+  border-radius: 6px;
+}
+.step-container.active h2 {
+  background-color: #37475c;
+}
+.step-container p {
+  color: #f0f0f0;
+  font-size: 1rem;
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 6px;
+}
+.step-container ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.step-container ul li {
+  background-color: #fff;
+  font-size: 1rem;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 6px;
+}
+.step-content {
+  padding: 15px;
+}
+
 /* Sección del Chat */
 .chat-section {
   display: flex;
@@ -264,7 +336,7 @@ li {
   }
 }
 
-.description-section {
+.description-section form {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -272,24 +344,28 @@ li {
   max-width: 600px;
   margin: 20px auto;
   padding: 25px;
-  background-color: #57739741;
+  background-color: #57739736;
   border-radius: 12px;
   border: 1px solid #577397;
 }
-
 .description-section div {
   width: 100%;
 }
-
 .description-section label {
-  display: block;
+  display: flex;
   margin-bottom: 8px;
   color: #f0f0f0;
   font-size: 0.9rem;
   font-weight: 500;
 }
-
-.description-section input {
+.description-section textarea {
+  resize: vertical;
+  min-height: 100px;
+  height: 200px;
+  max-height: 300px;
+  font-family: inherit;
+}
+.description-section input, .description-section textarea {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid #577397;
@@ -297,22 +373,33 @@ li {
   background-color: #37475c;
   color: #f0f0f0;
   font-size: 1rem;
-  transition: all 0.3s ease;
+  transition: color, border, background-color 0.3s ease;
 }
-
-.description-section input:focus {
+.description-section input:focus, .description-section textarea:focus {
   outline: none;
   border-color: #577397;
   box-shadow: 0 0 0 2px rgba(87, 115, 151, 0.2);
 }
-
-.description-section input::placeholder {
+.description-section input::placeholder, .description-section textarea::placeholder {
   color: #8794a4;
 }
-
-.description-section input:hover {
+.description-section input:hover, .description-section textarea:hover {
   border-color: #577397;
   background-color: #455a75;
+}
+
+.btn-sample {
+  margin: 0 !important;
+  align-self: flex-start;
+  border: 1px solid #577397 !important;
+  background-color: #ffffff00 !important;
+}
+
+.info-text {
+  color: #f0f0f0;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  text-align: center;
 }
 
 .file-section {
@@ -362,52 +449,62 @@ li {
   color: #d4d4d4;
   text-align: center;
 }
-
 .file-upload-label span {
   font-size: 16px;
   opacity: 0.8;
 }
-
 .file-upload-label input[type="file"] {
   display: none; /* Hide the actual file input */
-}
-
-.file-section button {
-  font-family: inherit;
-  margin: 20px auto;
-  padding: 10px 20px;
-  background-color: #37475c;
-  color: white;
-  border: none;
-  border-radius: 25px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.3s, transform 0.2s;
-}
-
-.file-section button:hover {
-  transform: scale(1.05);
 }
 
 .filtered-guests-section {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 20px;
   border-radius: 8px;
-  margin: 20px auto;
   max-width: 600px;
-}
-.filtered-guests-section h2 {
-  font-size: 1.5rem;
-  margin-bottom: 10px;
 }
 .filtered-guests-section ul {
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 200px;
   overflow-y: auto;
   width: 100%;
 }
+
+.info {
+  flex: 1;
+  margin-left: 8px;
+  position: relative;
+}
+.info-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-color: #577397;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 16px;
+  font-size: 12px;
+}
+
+#profile-info-text {
+  display: none;
+  position: absolute;
+  background-color: #37475c;
+  color: #f0f0f0;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #577397;
+  max-width: 300px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  margin-top: 5px;
+}
+
+#profile-info:hover + #profile-info-text {
+  display: block;
+}
+

@@ -1,13 +1,12 @@
 import json
 import io
 import re
-from uuid import uuid4
 
-from fastapi import FastAPI, UploadFile, Depends, HTTPException
+from fastapi import FastAPI, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import pandas as pd
 from pydantic import BaseModel
 
@@ -71,12 +70,12 @@ async def process_invitees(request: ProcessInviteesRequest):
 
         chat_history: ChatHistory = chat_histories[request.session_id]
         message = f"LinkedIn urls: {request.linkedin_urls}"
-
+        print(f"Processing LinkedIn URLs: {request.linkedin_urls}")
         response = await agent(message, chat_history)
 
         chat_history.add_user_message(message)
         chat_history.add_assistant_message(response)
-
+        print(f"Agent response: {response}")
         # Parse the response to check if the description is provided
         try:
             # Extract JSON content using regex
@@ -85,6 +84,7 @@ async def process_invitees(request: ProcessInviteesRequest):
                 return JSONResponse(content={"error": "Failed to extract the json response"}, status_code=400)
 
             parsed_response = json.loads(json_match.group())
+            print(f"Parsed response: {parsed_response}")
             retults = parsed_response.get("results", [])
             potential_clients = [client for client in retults if client.get("potential_match", False)]
         except json.JSONDecodeError:
@@ -120,7 +120,7 @@ async def chat(request: ChatRequest):
 
 
 class SendEmailsRequest(BaseModel):
-    session_id: str
+    email_body: str
     potential_clients: List[str]
 
 @app.post("/send_emails/")
@@ -145,24 +145,6 @@ async def send_emails(request: SendEmailsRequest):
                 continue
             # Ask the agent for the email content
             try:
-                # Retrieve or create a new chat history for the session
-                if request.session_id not in chat_histories:
-                    return JSONResponse(content={"error": "Session ID not found."}, status_code=400)
-
-                chat_history = chat_histories[request.session_id]
-
-                # Add the user's message to the chat history
-                input_message = f"Please write a personalized email to {recipient_email}."
-                chat_history.add_user_message(input_message)
-
-                # Get the agent's response
-                response_buffer = ""
-                async for content in agent.invoke_stream(chat_history):
-                    if content.content:
-                        response_buffer += content.content
-
-                # Add the agent's response to the chat history
-                chat_history.add_assistant_message(response_buffer)
 
                 # Create the email content
                 message = MIMEMultipart("alternative")
@@ -170,19 +152,7 @@ async def send_emails(request: SendEmailsRequest):
                 message["From"] = sender_email
                 message["To"] = recipient_email
 
-                # Customize the email body
-                email_body = f"""
-                Hi,
-
-                We are excited to invite you to our upcoming event! This is a great opportunity to connect and learn more about our company.
-
-                Looking forward to seeing you there!
-
-                Best regards,
-                The Team
-                """
-
-                message.attach(MIMEText(email_body, "plain"))
+                message.attach(MIMEText(request.email_body, "plain"))
 
                 # Send the email
                 server.sendmail(sender_email, recipient_email, message.as_string())
@@ -208,27 +178,6 @@ class EmailGenerationRequest(BaseModel):
 @app.get("/")
 def read_root():
     return {"message": "LinkedIn Profile Analysis API"}
-
-@app.post("/analyze")
-async def analyze_profiles(request: CompanyAnalysisRequest):
-    """
-    Analyze LinkedIn profiles based on company description
-    and generate personalized email drafts for potential clients
-    """
-    try:
-        # Call the multi-agent system to analyze profiles and generate emails
-        result = await analyze_linkedin_profiles(
-            company_description=request.company_description,
-            linkedin_urls=request.linkedin_urls
-        )
-        
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-            
-        return result
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
