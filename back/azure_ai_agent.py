@@ -144,6 +144,24 @@ COORDINATOR_INSTRUCTIONS = """
     Take immediate action on any analysis request.
 """
 
+WRITER_NAME = "writer_agent"
+WRITER_INSTRUCTIONS = """
+    You are a writer agent that generates well-structured emails based on LinkedIn profile analysis.
+    Your tasks:
+    1. When receiving a message with "action": "generate_email":
+        - Use the provided analysis results to create a personalized email
+        - Ensure the email is professional and tailored to the potential client
+        - Include key details from the profile analysis
+    2. Always format the email as a JSON object:
+        {
+            "action": "send_email",
+            "to": "recipient_email",
+            "subject": "Email Subject",
+            "body": "Email body content"
+        }
+
+    """
+
 class CompanyInfo(BaseModel):
     name: Optional[str] = None
     industry: Optional[str] = None
@@ -198,12 +216,11 @@ async def main(message: str, chat_history: ChatHistory) -> str:
     credential = DefaultAzureCredential()
 
     async with AzureAIAgent.create_client(credential=credential, conn_str=os.getenv("PROJECT_CONNECTION_STRING")) as azure_openai_client:
-
-        agent_definition = await azure_openai_client.agents.get_agent(os.getenv("WRITER_AGENT_ID")) 
         
         # Create kernels for agents
         linkedin_kernel = create_kernel("linkedin")
         coordinator_kernel = create_kernel("coordinator")
+        writer_kernel = create_kernel("writer")
         
         # Create the linkedin agent
         linkedin_agent = ChatCompletionAgent(
@@ -224,9 +241,11 @@ async def main(message: str, chat_history: ChatHistory) -> str:
         )
 
         # Create the writer agent with Azure OpenAI client hosted in Azure
-        writer_agent = AzureAIAgent(
-            client=azure_openai_client,
-            definition=agent_definition,
+        writer_agent = ChatCompletionAgent(
+            id=WRITER_NAME,
+            kernel=writer_kernel,
+            name=WRITER_NAME,
+            instructions=WRITER_INSTRUCTIONS,
         )
 
         # Create host agent using the new HostAgent class
