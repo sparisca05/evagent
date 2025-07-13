@@ -1,0 +1,226 @@
+.connection-setup {
+    min-height: 100vh;
+    background-color: #1b1b1b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.connection-setup-container {
+    background-color: #37475c;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 600px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid #577397;
+}
+
+.connection-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.connection-icon {
+    margin-bottom: 20px;
+}
+
+.connection-header h1 {
+    color: #f0f0f0;
+    font-size: 2rem;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.connection-header p {
+    color: #d6d6d6;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.connection-form {
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #f0f0f0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.required {
+    color: #ff6b6b;
+    margin-left: 4px;
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #577397;
+    border-radius: 8px;
+    background-color: #455a75;
+    color: #f0f0f0;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-group textarea:focus {
+    outline: none;
+    border-color: #577397;
+    box-shadow: 0 0 0 2px rgba(87, 115, 151, 0.2);
+}
+
+.form-group textarea::placeholder {
+    color: #8794a4;
+}
+
+.form-help {
+    display: block;
+    color: #8794a4;
+    font-size: 0.8rem;
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #ff6b6b20;
+    border: 1px solid #ff6b6b;
+    border-radius: 6px;
+    padding: 12px;
+    color: #ff6b6b;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-sample {
+    background-color: transparent;
+    border: 1px solid #577397;
+    color: #577397;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.btn-sample:hover {
+    background-color: #577397;
+    color: white;
+}
+
+.btn-connect {
+    background-color: #577397;
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.btn-connect:hover:not(:disabled) {
+    background-color: #6b8bb5;
+    transform: translateY(-1px);
+}
+
+.btn-connect:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff40;
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.connection-info {
+    background-color: #57739741;
+    border: 1px solid #577397;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.connection-info h3 {
+    color: #f0f0f0;
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.connection-info ul {
+    color: #d6d6d6;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding-left: 20px;
+}
+
+.connection-info li {
+    margin-bottom: 6px;
+}
+
+.connection-info li::marker {
+    color: #577397;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .connection-setup-container {
+        padding: 30px 20px;
+        margin: 10px;
+    }
+    
+    .connection-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .btn-sample,
+    .btn-connect {
+        width: 100%;
+        justify-content: center;
+    }
+}

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { FaRegComment, FaArrowDown } from "react-icons/fa";
 
 import Chat from "./components/Chat/Chat";
+import ConnectionSetup from "./components/ConnectionSetup/ConnectionSetup";
 import "./App.css";
 import { FaCircleChevronRight } from "react-icons/fa6";
 
@@ -10,6 +11,7 @@ import { FaCircleChevronRight } from "react-icons/fa6";
 const sessionId = `session-${Date.now()}-${Math.random().toString(36)}`;
 
 function App() {
+    const [isConnected, setIsConnected] = useState(false);
     const [activeSection, setActiveSection] = useState<
         "description" | "file" | "process" | "emails"
     >("description");
@@ -55,6 +57,36 @@ function App() {
     >([]);
     const [emailsCreated, setEmailsCreated] = useState(false);
     const [emails, setEmails] = useState<string>();
+
+    // Check connection status on component mount
+    useEffect(() => {
+        checkConnectionStatus();
+    }, []);
+
+    const checkConnectionStatus = async () => {
+        try {
+            const response = await axios.get(
+                "http://localhost:8000/connection_status/"
+            );
+            if (response.data.connected) {
+                setIsConnected(true);
+            }
+        } catch (error) {
+            console.error("Error checking connection status:", error);
+        }
+    };
+
+    const handleConnectionEstablished = async (connString: string) => {
+        try {
+            await axios.post("http://localhost:8000/set_connection/", {
+                connection_string: connString,
+            });
+            setIsConnected(true);
+        } catch (error) {
+            console.error("Error setting connection:", error);
+            alert("Failed to establish connection. Please try again.");
+        }
+    };
 
     const handleCompanyDataChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -250,335 +282,395 @@ function App() {
     };
 
     return (
-        <div className={`app ${isChatOpen ? "chat-open" : "chat-closed"}`}>
-            <header className="header">
-                <div className="header-content">
-                    <div className="logo">
-                        <div className="logo-icon">EVA</div>
-                        <div className="logo-text">
-                            <h1>Evagent</h1>
-                            <p>Find your potential customers</p>
+        <>
+            {!isConnected ? (
+                <ConnectionSetup
+                    onConnectionEstablished={handleConnectionEstablished}
+                />
+            ) : (
+                <div
+                    className={`app ${
+                        isChatOpen ? "chat-open" : "chat-closed"
+                    }`}
+                >
+                    <header className="header">
+                        <div className="header-content">
+                            <div className="logo">
+                                <div className="logo-icon">EVA</div>
+                                <div className="logo-text">
+                                    <h1>Evagent</h1>
+                                    <p>Find your potential customers</p>
+                                </div>
+                            </div>
+                            <div className="connection-status">
+                                <span className="status-dot"></span>
+                                <span>Online</span>
+                            </div>
                         </div>
-                    </div>
-                    <div className="connection-status">
-                        <span className="status-dot"></span>
-                        <span>Online</span>
-                    </div>
-                </div>
-            </header>
-            <main className="main-content">
-                <section className="agent-section">
-                    <section className="intro-section">
-                        <h1>Welcome to Evagent</h1>
-                        <h3>
-                            <br />
-                            Your AI-powered LinkedIn Lead Generation Assistant
-                            <br />
-                            <br />
-                            Evagent helps businesses identify and connect with
-                            their ideal clients by intelligently analyzing
-                            LinkedIn profiles. Here's how it works:
-                            <br />
-                            <br />
-                            1. Tell us about your business and ideal customer
-                            profile
-                            <br />
-                            2. Upload a list of LinkedIn profiles to analyze
-                            <br />
-                            3. Let our AI analyze and match profiles to your
-                            criteria
-                            <br />
-                            4. Generate personalized outreach emails for
-                            qualified leads
-                            <br />
-                            <br />
-                            Perfect for sales teams, recruiters, and business
-                            developers who want to:
-                            <br />
-                            • Save time on lead qualification
-                            <br />
-                            • Improve targeting accuracy
-                            <br />
-                            • Create personalized outreach at scale
-                            <br />
-                            • Connect with the right decision-makers
-                            <br />
-                        </h3>
-                        <a href="#steps-section" className="btn">
-                            <span className="btn-text-one">Get Started</span>
-                            <span className="btn-text-two">
-                                <FaArrowDown size={20} />
-                            </span>
-                        </a>
-                    </section>
-                    <section className="steps-section" id="steps-section">
-                        <section
-                            className={`step-container ${
-                                activeSection === "description"
-                                    ? "active"
-                                    : "inactive"
-                            }`}
-                        >
-                            <h2>Step 1: Provide your company information</h2>
-                            <div className="description-section step-content">
-                                <form onSubmit={handleCompanyDataSubmit}>
-                                    <div>
-                                        <label>Name</label>
-                                        <input
-                                            name="name"
-                                            type="text"
-                                            value={companyData.name}
-                                            onChange={handleCompanyDataChange}
-                                            placeholder="Enter your company name"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label>
-                                            Description{" "}
-                                            <span className="info">
-                                                <span
-                                                    id="profile-info"
-                                                    className="info-icon"
-                                                >
-                                                    i
-                                                </span>
-
-                                                <p
-                                                    id="profile-info-text"
-                                                    className="info-text"
-                                                >
-                                                    A detailed description will
-                                                    help the AI understand your
-                                                    business better.
-                                                </p>
-                                            </span>
-                                        </label>
-                                        <textarea
-                                            name="description"
-                                            maxLength={500}
-                                            value={companyData.description}
-                                            onChange={handleCompanyDataChange}
-                                            placeholder={`Describe your company and its services or products.\n\nBe specific and ensure to include this details:\n- What does your company do?\n- What are your main products or services?\n- What is your main industry activity?`}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label>
-                                            Ideal profile{" "}
-                                            <span className="info">
-                                                <span
-                                                    id="profile-info"
-                                                    className="info-icon"
-                                                >
-                                                    i
-                                                </span>
-
-                                                <p
-                                                    id="profile-info-text"
-                                                    className="info-text"
-                                                >
-                                                    A detailed description will
-                                                    help the AI filter the
-                                                    LinkedIn profiles more
-                                                    effectively.
-                                                </p>
-                                            </span>
-                                        </label>
-                                        <textarea
-                                            name="idealProfile"
-                                            maxLength={300}
-                                            value={companyData.idealProfile}
-                                            onChange={handleCompanyDataChange}
-                                            placeholder={`Describe the ideal profile of your potential clients.\n\nBe specific and ensure to include this details:\n- What is the job title or role of your ideal client?\n- What industry or sector do they belong to?\n- Any other specific characteristics?`}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn-sample"
-                                        onClick={() => {
-                                            setCompanyData(sampleData);
-                                        }}
-                                    >
-                                        Use sample values
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={sendButtonDisabled}
-                                    >
-                                        Submit
-                                    </button>
-                                </form>
-                            </div>
-                            <div className="agent-response-section">
-                                <h2>Agent Response</h2>
-                                <p>
-                                    {descriptionLoading ? (
-                                        <span className="loading-text">
-                                            Loading response...
-                                        </span>
-                                    ) : (
-                                        <span className="response-text">
-                                            {descriptionResponse}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                        </section>
-
-                        <section
-                            className={`step-container ${
-                                activeSection === "file" ? "active" : "inactive"
-                            }`}
-                        >
-                            <h2>
-                                Step 2: Upload a file with invitees profiles
-                            </h2>
-                            <div className="step-content">
-                                <section className="file-upload-section">
-                                    <label className="file-upload-label">
-                                        <span className="file-icon">📁</span>
-                                        <input
-                                            name="file"
-                                            type="file"
-                                            draggable
-                                            accept=".xlsx, .xls"
-                                            onDrop={(e) => {
-                                                e.preventDefault();
-                                                handleFileUpload(e);
-                                            }}
-                                            onDragOver={(e) =>
-                                                e.preventDefault()
-                                            }
-                                            onChange={handleFileUpload}
-                                        />
-                                        <span>{filePlaceholder}</span>
-                                    </label>
-                                </section>
-                            </div>
-                            <h2>Extracted LinkedIn URLs</h2>
-                            <ul>
-                                {linkedinUrls !== undefined &&
-                                    linkedinUrls.map((url, index) => (
-                                        <li key={index}>
-                                            <a href={url} target="_blank">
-                                                {url}
-                                            </a>
-                                        </li>
-                                    ))}
-                            </ul>
-                        </section>
-
-                        <section
-                            className={`step-container ${
-                                activeSection === "process"
-                                    ? "active"
-                                    : "inactive"
-                            }`}
-                        >
-                            <h2>Step 3: Process LinkedIn URLs</h2>
-                            <div className="step-content">
-                                <button
-                                    onClick={handleProcessLinkedinUrls}
-                                    disabled={processButtonDisabled}
-                                >
-                                    Process LinkedIn URLs
-                                </button>
-                            </div>
-                            <section className="filtered-guests-section">
-                                <h2>Filtered Users</h2>
-                                {processing ? (
-                                    <span className="loading-text">
-                                        Processing LinkedIn URLs...
+                    </header>
+                    <main className="main-content">
+                        <section className="agent-section">
+                            <section className="intro-section">
+                                <h1>Welcome to Evagent</h1>
+                                <h3>
+                                    <br />
+                                    Your AI-powered LinkedIn Lead Generation
+                                    Assistant
+                                    <br />
+                                    <br />
+                                    Evagent helps businesses identify and
+                                    connect with their ideal clients by
+                                    intelligently analyzing LinkedIn profiles.
+                                    Here's how it works:
+                                    <br />
+                                    <br />
+                                    1. Tell us about your business and ideal
+                                    customer profile
+                                    <br />
+                                    2. Upload a list of LinkedIn profiles to
+                                    analyze
+                                    <br />
+                                    3. Let our AI analyze and match profiles to
+                                    your criteria
+                                    <br />
+                                    4. Generate personalized outreach emails for
+                                    qualified leads
+                                    <br />
+                                    <br />
+                                    Perfect for sales teams, recruiters, and
+                                    business developers who want to:
+                                    <br />
+                                    • Save time on lead qualification
+                                    <br />
+                                    • Improve targeting accuracy
+                                    <br />
+                                    • Create personalized outreach at scale
+                                    <br />
+                                    • Connect with the right decision-makers
+                                    <br />
+                                </h3>
+                                <a href="#steps-section" className="btn">
+                                    <span className="btn-text-one">
+                                        Get Started
                                     </span>
-                                ) : (
+                                    <span className="btn-text-two">
+                                        <FaArrowDown size={20} />
+                                    </span>
+                                </a>
+                            </section>
+                            <section
+                                className="steps-section"
+                                id="steps-section"
+                            >
+                                <section
+                                    className={`step-container ${
+                                        activeSection === "description"
+                                            ? "active"
+                                            : "inactive"
+                                    }`}
+                                >
+                                    <h2>
+                                        Step 1: Provide your company information
+                                    </h2>
+                                    <div className="description-section step-content">
+                                        <form
+                                            onSubmit={handleCompanyDataSubmit}
+                                        >
+                                            <div>
+                                                <label>Name</label>
+                                                <input
+                                                    name="name"
+                                                    type="text"
+                                                    value={companyData.name}
+                                                    onChange={
+                                                        handleCompanyDataChange
+                                                    }
+                                                    placeholder="Enter your company name"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>
+                                                    Description{" "}
+                                                    <span className="info">
+                                                        <span
+                                                            id="profile-info"
+                                                            className="info-icon"
+                                                        >
+                                                            i
+                                                        </span>
+
+                                                        <p
+                                                            id="profile-info-text"
+                                                            className="info-text"
+                                                        >
+                                                            A detailed
+                                                            description will
+                                                            help the AI
+                                                            understand your
+                                                            business better.
+                                                        </p>
+                                                    </span>
+                                                </label>
+                                                <textarea
+                                                    name="description"
+                                                    maxLength={500}
+                                                    value={
+                                                        companyData.description
+                                                    }
+                                                    onChange={
+                                                        handleCompanyDataChange
+                                                    }
+                                                    placeholder={`Describe your company and its services or products.\n\nBe specific and ensure to include this details:\n- What does your company do?\n- What are your main products or services?\n- What is your main industry activity?`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>
+                                                    Ideal profile{" "}
+                                                    <span className="info">
+                                                        <span
+                                                            id="profile-info"
+                                                            className="info-icon"
+                                                        >
+                                                            i
+                                                        </span>
+
+                                                        <p
+                                                            id="profile-info-text"
+                                                            className="info-text"
+                                                        >
+                                                            A detailed
+                                                            description will
+                                                            help the AI filter
+                                                            the LinkedIn
+                                                            profiles more
+                                                            effectively.
+                                                        </p>
+                                                    </span>
+                                                </label>
+                                                <textarea
+                                                    name="idealProfile"
+                                                    maxLength={300}
+                                                    value={
+                                                        companyData.idealProfile
+                                                    }
+                                                    onChange={
+                                                        handleCompanyDataChange
+                                                    }
+                                                    placeholder={`Describe the ideal profile of your potential clients.\n\nBe specific and ensure to include this details:\n- What is the job title or role of your ideal client?\n- What industry or sector do they belong to?\n- Any other specific characteristics?`}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn-sample"
+                                                onClick={() => {
+                                                    setCompanyData(sampleData);
+                                                }}
+                                            >
+                                                Use sample values
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={sendButtonDisabled}
+                                            >
+                                                Submit
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div className="agent-response-section">
+                                        <h2>Agent Response</h2>
+                                        <p>
+                                            {descriptionLoading ? (
+                                                <span className="loading-text">
+                                                    Loading response...
+                                                </span>
+                                            ) : (
+                                                <span className="response-text">
+                                                    {descriptionResponse}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </section>
+
+                                <section
+                                    className={`step-container ${
+                                        activeSection === "file"
+                                            ? "active"
+                                            : "inactive"
+                                    }`}
+                                >
+                                    <h2>
+                                        Step 2: Upload a file with invitees
+                                        profiles
+                                    </h2>
+                                    <div className="step-content">
+                                        <section className="file-upload-section">
+                                            <label className="file-upload-label">
+                                                <span className="file-icon">
+                                                    📁
+                                                </span>
+                                                <input
+                                                    name="file"
+                                                    type="file"
+                                                    draggable
+                                                    accept=".xlsx, .xls"
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        handleFileUpload(e);
+                                                    }}
+                                                    onDragOver={(e) =>
+                                                        e.preventDefault()
+                                                    }
+                                                    onChange={handleFileUpload}
+                                                />
+                                                <span>{filePlaceholder}</span>
+                                            </label>
+                                        </section>
+                                    </div>
+                                    <h2>Extracted LinkedIn URLs</h2>
                                     <ul>
-                                        {filteredData.length > 0 &&
-                                            filteredData.map((item, index) => (
+                                        {linkedinUrls !== undefined &&
+                                            linkedinUrls.map((url, index) => (
                                                 <li key={index}>
-                                                    <strong>Name:</strong>{" "}
-                                                    {item.url}
-                                                    <br />
-                                                    <strong>
-                                                        Match reason:
-                                                    </strong>{" "}
-                                                    {item.match_reason}
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                    >
+                                                        {url}
+                                                    </a>
                                                 </li>
                                             ))}
                                     </ul>
-                                )}
+                                </section>
+
+                                <section
+                                    className={`step-container ${
+                                        activeSection === "process"
+                                            ? "active"
+                                            : "inactive"
+                                    }`}
+                                >
+                                    <h2>Step 3: Process LinkedIn URLs</h2>
+                                    <div className="step-content">
+                                        <button
+                                            onClick={handleProcessLinkedinUrls}
+                                            disabled={processButtonDisabled}
+                                        >
+                                            Process LinkedIn URLs
+                                        </button>
+                                    </div>
+                                    <section className="filtered-guests-section">
+                                        <h2>Filtered Users</h2>
+                                        {processing ? (
+                                            <span className="loading-text">
+                                                Processing LinkedIn URLs...
+                                            </span>
+                                        ) : (
+                                            <ul>
+                                                {filteredData.length > 0 &&
+                                                    filteredData.map(
+                                                        (item, index) => (
+                                                            <li key={index}>
+                                                                <strong>
+                                                                    Name:
+                                                                </strong>{" "}
+                                                                {item.url}
+                                                                <br />
+                                                                <strong>
+                                                                    Match
+                                                                    reason:
+                                                                </strong>{" "}
+                                                                {
+                                                                    item.match_reason
+                                                                }
+                                                            </li>
+                                                        )
+                                                    )}
+                                            </ul>
+                                        )}
+                                    </section>
+                                </section>
+
+                                <section
+                                    className={`step-container ${
+                                        activeSection === "emails"
+                                            ? "active"
+                                            : "inactive"
+                                    }`}
+                                >
+                                    <h2>Step 4: Send Emails</h2>
+                                    <div className="step-content">
+                                        {emailsCreated && (
+                                            <p className="success-message">
+                                                Emails created successfully!
+                                            </p>
+                                        )}
+                                        <p className="info-message">
+                                            You can send personalized emails to
+                                            the filtered users based on the
+                                            generated drafts.
+                                            <br />
+                                            Click the button below to send
+                                            emails.
+                                        </p>
+                                        <button
+                                            onClick={handleSendEmails}
+                                            disabled={emailsCreated}
+                                        >
+                                            Generate Emails
+                                        </button>
+                                    </div>
+                                    <h2>Agent Response</h2>
+                                    <section className="agent-response-section">
+                                        <p>
+                                            {emailsCreated && (
+                                                <span className="response-text">
+                                                    {emails}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </section>
+                                </section>
                             </section>
                         </section>
-
                         <section
-                            className={`step-container ${
-                                activeSection === "emails"
-                                    ? "active"
-                                    : "inactive"
+                            className={`chat-section ${
+                                isChatOpen ? "expanded" : "collapsed"
                             }`}
                         >
-                            <h2>Step 4: Send Emails</h2>
-                            <div className="step-content">
-                                {emailsCreated && (
-                                    <p className="success-message">
-                                        Emails created successfully!
-                                    </p>
-                                )}
-                                <p className="info-message">
-                                    You can send personalized emails to the
-                                    filtered users based on the generated
-                                    drafts.
-                                    <br />
-                                    Click the button below to send emails.
-                                </p>
-                                <button
-                                    onClick={handleSendEmails}
-                                    disabled={emailsCreated}
-                                >
-                                    Generate Emails
-                                </button>
-                            </div>
-                            <h2>Agent Response</h2>
-                            <section className="agent-response-section">
-                                <p>
-                                    {emailsCreated && (
-                                        <span className="response-text">
-                                            {emails}
+                            <div
+                                className="chat-toggle"
+                                onClick={() => setIsChatOpen(!isChatOpen)}
+                            >
+                                {isChatOpen ? (
+                                    <span className="chat-icon">
+                                        <FaCircleChevronRight
+                                            size={34}
+                                            color="#577397"
+                                        />
+                                    </span>
+                                ) : (
+                                    <div>
+                                        <span className="chat-icon">
+                                            <FaRegComment
+                                                size={34}
+                                                color="#577397"
+                                            />
                                         </span>
-                                    )}
-                                </p>
-                            </section>
-                        </section>
-                    </section>
-                </section>
-                <section
-                    className={`chat-section ${
-                        isChatOpen ? "expanded" : "collapsed"
-                    }`}
-                >
-                    <div
-                        className="chat-toggle"
-                        onClick={() => setIsChatOpen(!isChatOpen)}
-                    >
-                        {isChatOpen ? (
-                            <span className="chat-icon">
-                                <FaCircleChevronRight
-                                    size={34}
-                                    color="#577397"
-                                />
-                            </span>
-                        ) : (
-                            <div>
-                                <span className="chat-icon">
-                                    <FaRegComment size={34} color="#577397" />
-                                </span>
-                                <p>Agent chat</p>
-                                <span className="demo">demo</span>
+                                        <p>Agent chat</p>
+                                        <span className="demo">demo</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                    <Chat sessionId={sessionId} isVisible={isChatOpen} />
-                </section>
-            </main>
-        </div>
+                            <Chat
+                                sessionId={sessionId}
+                                isVisible={isChatOpen}
+                            />
+                        </section>
+                    </main>
+                </div>
+            )}
+        </>
     );
 }
 

@@ -212,10 +212,15 @@ class HostAgent(ChatCompletionAgent):
             yield content
 
 # Update main function to use HostAgent
-async def main(message: str, chat_history: ChatHistory) -> str:
+async def main(message: str, chat_history: ChatHistory, connection_string: str = None) -> str:
     credential = DefaultAzureCredential()
+    
+    # Use provided connection string or fall back to environment variable
+    conn_str = connection_string or os.getenv("PROJECT_CONNECTION_STRING")
+    if not conn_str:
+        raise ValueError("No Azure connection string provided. Please set up your connection first.")
 
-    async with AzureAIAgent.create_client(credential=credential, conn_str=os.getenv("PROJECT_CONNECTION_STRING")) as azure_openai_client:
+    async with AzureAIAgent.create_client(credential=credential, conn_str=conn_str) as azure_openai_client:
         
         # Create kernels for agents
         linkedin_kernel = create_kernel("linkedin")

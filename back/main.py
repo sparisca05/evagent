@@ -23,6 +23,9 @@ app = FastAPI()
 # Dictionary to store chat histories for each session
 chat_histories = {}
 
+# Store the connection string globally (in production, use a proper session management)
+azure_connection_string = None
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +35,97 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/upload_excel/")
+class ProcessInviteesRequest(BaseModel):
+    session_id: str
+    linkedin_urls: List[str]
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
+class SendEmailsRequest(BaseModel):
+    email_body: str
+    potential_clients: List[str]
+
+class ConnectionTestRequest(BaseModel):
+    connection_string: str
+
+class SetConnectionRequest(BaseModel):
+    connection_string: str
+
+class CompanyAnalysisRequest(BaseModel):
+    company_description: str
+    linkedin_urls: List[str]
+
+class EmailGenerationRequest(BaseModel):
+    company_description: str
+    potential_clients: List[Dict[str, Any]]
+
+@app.post("/test_connection/")
+async def test_connection(request: ConnectionTestRequest):
+    """Endpoint to test Azure connection string."""
+    try:
+        # Test the connection by attempting to create a client
+        from azure.identity import DefaultAzureCredential
+        from azure_ai_agent import create_kernel
+        
+        # Try to create a kernel with the provided connection string
+        credential = DefaultAzureCredential()
+        
+        # Temporarily set the connection string for testing
+        import os
+        original_conn_str = os.environ.get("PROJECT_CONNECTION_STRING")
+        os.environ["PROJECT_CONNECTION_STRING"] = request.connection_string
+        
+        try:
+            # Try to create a simple kernel to test the connection
+            kernel = create_kernel("test")
+            
+            # If we get here, the connection string is valid
+            global azure_connection_string
+            azure_connection_string = request.connection_string
+            
+            return {"status": "success", "message": "Connection successful"}
+        except Exception as test_error:
+            return JSONResponse(
+                content={"status": "error", "message": f"Connection failed: {str(test_error)}"}, 
+                status_code=400
+            )
+        finally:
+            # Restore original connection string
+            if original_conn_str:
+                os.environ["PROJECT_CONNECTION_STRING"] = original_conn_str
+            elif "PROJECT_CONNECTION_STRING" in os.environ:
+                del os.environ["PROJECT_CONNECTION_STRING"]
+                
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/set_connection/")
+async def set_connection(request: SetConnectionRequest):
+    """Endpoint to set the Azure connection string for the session."""
+    try:
+        global azure_connection_string
+        azure_connection_string = request.connection_string
+        
+        # Set it in environment for the current session
+        import os
+        os.environ["PROJECT_CONNECTION_STRING"] = request.connection_string
+        
+        return {"status": "success", "message": "Connection string set successfully"}
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/connection_status/")
+async def get_connection_status():
+    """Check if a connection string is currently set."""
+    global azure_connection_string
+    is_connected = azure_connection_string is not None
+    
+    return {
+        "connected": is_connected,
+        "message": "Connection established" if is_connected else "No connection established"
+    }
 async def upload_excel(file: UploadFile):
     """Endpoint to upload the Excel file with invitees."""
     try:
@@ -71,7 +164,13 @@ async def process_invitees(request: ProcessInviteesRequest):
         chat_history: ChatHistory = chat_histories[request.session_id]
         message = f"LinkedIn urls: {request.linkedin_urls}"
         print(f"Processing LinkedIn URLs: {request.linkedin_urls}")
-        response = await agent(message, chat_history)
+        
+        # Check if connection string is available
+        global azure_connection_string
+        if not azure_connection_string:
+            return JSONResponse(content={"error": "Azure connection not established. Please configure your connection first."}, status_code=400)
+        
+        response = await agent(message, chat_history, azure_connection_string)
 
         chat_history.add_user_message(message)
         chat_history.add_assistant_message(response)
@@ -95,10 +194,6 @@ async def process_invitees(request: ProcessInviteesRequest):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-class ChatRequest(BaseModel):
-    session_id: str
-    message: str
-
 @app.post("/chat/")
 async def chat(request: ChatRequest):
     """Endpoint to chat with the agent while maintaining memory."""
@@ -109,7 +204,12 @@ async def chat(request: ChatRequest):
 
         chat_history: ChatHistory = chat_histories[request.session_id]
 
-        response = await agent(request.message, chat_history)
+        # Check if connection string is available
+        global azure_connection_string
+        if not azure_connection_string:
+            return JSONResponse(content={"error": "Azure connection not established. Please configure your connection first."}, status_code=400)
+
+        response = await agent(request.message, chat_history, azure_connection_string)
 
         chat_history.add_user_message(request.message)
         chat_history.add_assistant_message(response)
@@ -118,10 +218,6 @@ async def chat(request: ChatRequest):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-
-class SendEmailsRequest(BaseModel):
-    email_body: str
-    potential_clients: List[str]
 
 @app.post("/send_emails/")
 async def send_emails(request: SendEmailsRequest):
@@ -166,14 +262,6 @@ async def send_emails(request: SendEmailsRequest):
         return {"message": "Emails sent successfully."}
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
-class CompanyAnalysisRequest(BaseModel):
-    company_description: str
-    linkedin_urls: List[str]
-
-class EmailGenerationRequest(BaseModel):
-    company_description: str
-    potential_clients: List[Dict[str, Any]]
 
 @app.get("/")
 def read_root():
