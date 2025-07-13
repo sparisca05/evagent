@@ -2,6 +2,9 @@ import { useState } from "react";
 import { FaKey, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 import "./ConnectionSetup.css";
 
+// API URL from environment variable
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 interface ConnectionSetupProps {
     onConnectionEstablished: (connectionString: string) => void;
 }
@@ -13,18 +16,15 @@ const ConnectionSetup = ({ onConnectionEstablished }: ConnectionSetupProps) => {
 
     const testConnection = async (connString: string): Promise<boolean> => {
         try {
-            const response = await fetch(
-                "http://localhost:8000/test_connection",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        connection_string: connString,
-                    }),
-                }
-            );
+            const response = await fetch(`${API_URL}/test_connection`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    connection_string: connString,
+                }),
+            });
 
             return response.ok;
         } catch (error) {

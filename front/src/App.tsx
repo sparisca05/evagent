@@ -7,6 +7,9 @@ import ConnectionSetup from "./components/ConnectionSetup/ConnectionSetup";
 import "./App.css";
 import { FaCircleChevronRight } from "react-icons/fa6";
 
+// API URL from environment variable
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 // Generate a unique session ID
 const sessionId = `session-${Date.now()}-${Math.random().toString(36)}`;
 
@@ -65,9 +68,7 @@ function App() {
 
     const checkConnectionStatus = async () => {
         try {
-            const response = await axios.get(
-                "http://localhost:8000/connection_status/"
-            );
+            const response = await axios.get(`${API_URL}/connection_status/`);
             if (response.data.connected) {
                 setIsConnected(true);
             }
@@ -78,7 +79,7 @@ function App() {
 
     const handleConnectionEstablished = async (connString: string) => {
         try {
-            await axios.post("http://localhost:8000/set_connection/", {
+            await axios.post(`${API_URL}/set_connection/`, {
                 connection_string: connString,
             });
             setIsConnected(true);
@@ -104,7 +105,7 @@ function App() {
         setDescriptionLoading(true);
         try {
             const response = await axios.post(
-                "http://localhost:8000/chat/",
+                `${API_URL}/chat/`,
                 {
                     session_id: sessionId,
                     message: `Company Name: ${companyData.name}, Description: ${companyData.description}, Ideal Profile: ${companyData.idealProfile}`,
@@ -135,7 +136,7 @@ function App() {
 
             try {
                 const response = await axios.post(
-                    "http://localhost:8000/upload_excel/",
+                    `${API_URL}/upload_excel/`,
                     formData,
                     {
                         headers: {
@@ -165,7 +166,7 @@ function App() {
         setProcessing(true);
         try {
             const response = await axios.post(
-                "http://localhost:8000/process_invitees/",
+                `${API_URL}/process_invitees/`,
                 {
                     session_id: sessionId,
                     linkedin_urls: linkedinUrls,
@@ -222,7 +223,7 @@ function App() {
             }));
 
             const response = await axios.post(
-                "http://localhost:8000/chat/",
+                `${API_URL}/chat/`,
                 {
                     session_id: sessionId,
                     message: `Create personalized email drafts for the following potential clients:
@@ -265,7 +266,7 @@ function App() {
         console.log("Sending emails...");
         try {
             const response = await axios.post(
-                "http://localhost:8000/send_emails/",
+                `${API_URL}/send_emails/`,
                 { potential_clients: filteredEmails },
                 {
                     headers: {

@@ -3,6 +3,9 @@ import axios from "axios";
 import Message from "../Message/Message";
 import "./Chat.css";
 
+// API URL from environment variable
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 const Chat = ({
     sessionId,
     isVisible,
@@ -39,7 +42,7 @@ const Chat = ({
             try {
                 // Send the message to the backend
                 const response = await axios.post(
-                    "http://localhost:8000/chat",
+                    `${API_URL}/chat`,
                     {
                         session_id: sessionId,
                         message: inputValue,
